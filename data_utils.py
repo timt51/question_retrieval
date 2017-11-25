@@ -29,17 +29,22 @@ def download_ask_ubuntu_dataset():
         except subprocess.SubprocessError:
             print("Error: May have failed to download the dataset")
 
-def load_corpus():
+def sequence_to_indicies(sequence, word_to_index):
+    return [word_to_index.get(word, len(word_to_index)) for word in sequence]
+
+def load_corpus(word_to_index):
     """
     Returns dict: id -> namedtuple(title, body)
+    title and body are encoded as sequences of indicies using word_to_index.
+    For a token T not in word_to_index, word_to_index[T] = len(word_to_index).
     """
     corpus = {}
     with gzip.open(TOKENIZED_CORPUS_PATH, 'rt', encoding="utf8") as file:
         for line in file:
             entry_id, title, body = line.split("\t")
             entry_id = int(entry_id)
-            title = title.split(" ")
-            body = body.split(" ")
+            title = sequence_to_indicies(title.split(" "), word_to_index)
+            body = sequence_to_indicies(body.split(" "), word_to_index)
             corpus[entry_id] = CorpusEntry(title, body)
     return corpus
 

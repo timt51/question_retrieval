@@ -1,6 +1,8 @@
 from collections import namedtuple
 
 import data_utils
+import models
+import train_utils
 
 ##############################################################################
 # Settings
@@ -13,18 +15,16 @@ CUDA = False
 Data = namedtuple("Data", \
         "corpus train dev test embeddings word_to_index")
 data_utils.download_ask_ubuntu_dataset()
-CORPUS = data_utils.load_corpus()
+EMBEDDINGS, WORD_TO_INDEX = data_utils.load_embeddings()
+CORPUS = data_utils.load_corpus(WORD_TO_INDEX)
 TRAIN_DATA = data_utils.load_train_data()
 DEV_DATA, TEST_DATA = data_utils.load_eval_data()
-EMBEDDINGS, WORD_TO_INDEX = data_utils.load_embeddings()
 DATA = Data(CORPUS, TRAIN_DATA, DEV_DATA, TEST_DATA,\
             EMBEDDINGS, WORD_TO_INDEX)
 
 ##############################################################################
 # Train and evaluate the models
 ##############################################################################
-Result = namedtuple("Result", \
-        "model lr other_hyperparameters map mrr pat1 pat5")
 RESULTS = []
 # OPTIMIZER = ...
 # CRITERION = helper.MaxMarginLoss(margin)
