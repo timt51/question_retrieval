@@ -8,7 +8,7 @@ def merge_title_and_body(corpus_entry):
     return np.hstack([corpus_entry.title, corpus_entry.body])
 
 def pad(np_array, max_length, value):
-    return np.pad(np_array,(0,max_length-len(np_array)),'constant',constant_values=value)
+    return np.pad(np_array, (0, max_length-len(np_array)), 'constant', constant_values=value)
 
 def process_batch_pairs(pairs, data, corpus, word_to_index):
     max_length = 0
@@ -39,6 +39,11 @@ def process_batch_pairs(pairs, data, corpus, word_to_index):
 
 def train_model(model, optimizer, criterion, data,\
                 max_epochs, batch_size, cuda):
+    """
+    Train the model with the given parameters.
+    Returns the model at the epoch that produces the highest MRR
+    on the dev set.
+    """
     if cuda:
         model = model.cuda()
 
@@ -64,3 +69,5 @@ def train_model(model, optimizer, criterion, data,\
             loss.backward()
             optimizer.zero_grad()
             optimizer.step()
+        # Evaluate on the dev set and save the MRR and model parameters
+    # Pick the best epoch and return the model from that epoch
