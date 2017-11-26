@@ -35,7 +35,7 @@ def sequence_to_indicies(sequence, word_to_index):
 def load_corpus(word_to_index):
     """
     Returns dict: id -> namedtuple(title, body)
-    title and body are encoded as sequences of indicies using word_to_index.
+    title and body are encoded as np arrays of indicies using word_to_index.
     For a token T not in word_to_index, word_to_index[T] = len(word_to_index).
     """
     corpus = {}
@@ -45,7 +45,7 @@ def load_corpus(word_to_index):
             entry_id = int(entry_id)
             title = sequence_to_indicies(title.split(" "), word_to_index)
             body = sequence_to_indicies(body.split(" "), word_to_index)
-            corpus[entry_id] = CorpusEntry(title, body)
+            corpus[entry_id] = CorpusEntry(np.array(title), np.array(body))
     return corpus
 
 def load_train_data():
