@@ -1,10 +1,13 @@
 import random
 
+from tqdm import tqdm
 import numpy as np
 import torch
 from torch.autograd import Variable
 
 import helpers
+
+NEGATIVE_QUERYS_PER_SAMPLE = 2
 
 def merge_title_and_body(corpus_entry):
     return np.hstack([corpus_entry.title, corpus_entry.body])
@@ -30,7 +33,8 @@ def process_batch_pairs(pairs, data, corpus, word_to_index):
         batch_querys.append(pad(query_index_sequence, max_length, len(word_to_index)))
         positive_index_sequence = merge_title_and_body(corpus[positive])
         batch_positives.append(pad(positive_index_sequence, max_length, len(word_to_index)))
-        negatives = [merge_title_and_body(corpus[neg]) for neg in data[(query, positive)]]
+        negatives = [merge_title_and_body(corpus[neg]) \
+                    for neg in random.sample(data[(query, positive)], NEGATIVE_QUERYS_PER_SAMPLE)]
         negatives = [pad(neg, max_length, len(word_to_index)) for neg in negatives]
         batch_negatives.append(negatives)
 
@@ -50,11 +54,11 @@ def train_model(model, optimizer, criterion, data,\
         model = model.cuda()
 
     model.train()
-    for epoch in range(max_epochs):
+    for epoch in tqdm(range(max_epochs)):
         similar_pairs = list(data.train.keys())
         random.shuffle(similar_pairs)
 
-        for i in range(0, len(similar_pairs), batch_size):
+        for i in tqdm(range(0, len(similar_pairs), batch_size)):
             query, positive, negatives = process_batch_pairs(similar_pairs[i:i + batch_size], \
                                             data.train, data.corpus, data.word_to_index)
             query, positive, negatives = Variable(query), Variable(positive), Variable(negatives)
@@ -62,10 +66,14 @@ def train_model(model, optimizer, criterion, data,\
                 query, positive, negatives = \
                     query.cuda(), positive.cuda(), negatives.cuda()
 
-            query_encoding = model(query)
-            positive_encoding = model(positive)
+            query_encoding = model(query.long())
+            positive_encoding = model(positive.long())
+            # negative_encodings: (batch_sample_index, negative_query_index, seq_len)
+            # input to model: (batch_sample_index, seq_len)
+            # model output: (batch_sample_index, encoding_len)
             negative_encodings = torch.stack(\
-                                [model(negatives[:, i]) for i in range(len(negatives))])
+                [model(negatives[:, i].long()) for i in range(NEGATIVE_QUERYS_PER_SAMPLE)])
+            # negative_encodings: (negative_query_index, batch_sample_index, encoding_len)
             loss = criterion(positive_encoding, negative_encodings, query_encoding)
 
             loss.backward()
