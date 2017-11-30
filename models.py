@@ -1,5 +1,8 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+
+OUT_CHANNELS = 667
 
 class LSTM(nn.Module):
     def __init__(self, embeddings):
@@ -15,7 +18,7 @@ class LSTM(nn.Module):
         pass
 
 class CNN(nn.Module):
-    def __init__(self, embeddings):
+    def __init__(self, embeddings, filter_width, pool_method):
         super(CNN, self).__init__()
 
         vocab_size, embed_dim = embeddings.shape
@@ -24,5 +27,17 @@ class CNN(nn.Module):
                                             padding_idx=vocab_size)
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
 
-    def forward():
-        pass
+        self.conv2d = nn.Conv2d(1, OUT_CHANNELS, (filter_width, embed_dim))
+
+        self.pool_method = pool_method
+
+    def forward(self, word_indicies):
+        embeddings = self.embedding_layer(word_indicies)
+        convolved = self.conv2d(embeddings.unsqueeze(1))
+        activation = F.tanh(convolved.squeeze(3))
+        if self.pool_method == "max":
+            return torch.max(activation, 3)
+        elif self.pool_method == "average":
+            return torch.mean(activation, 3)
+        else:
+            raise ValueError("Invalid self.pool_method: " + str(self.pool_method))
