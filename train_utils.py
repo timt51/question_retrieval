@@ -2,6 +2,8 @@ import random
 
 import numpy as np
 import torch
+from torch.autograd import Variable
+
 import helpers
 
 def merge_title_and_body(corpus_entry):
@@ -13,10 +15,10 @@ def pad(np_array, max_length, value):
 def process_batch_pairs(pairs, data, corpus, word_to_index):
     max_length = 0
     for query, positive in pairs:
-        query = merge_title_and_body(corpus[query])
-        max_length = max(max_length, len(query))
-        positive = merge_title_and_body(corpus[positive])
-        max_length = max(max_length, positive)
+        query_index_sequence = merge_title_and_body(corpus[query])
+        max_length = max(max_length, len(query_index_sequence))
+        positive_index_sequence = merge_title_and_body(corpus[positive])
+        max_length = max(max_length, len(positive_index_sequence))
         negatives = [merge_title_and_body(corpus[neg]) for neg in data[(query, positive)]]
         max_length = max(max_length, max(map(len, negatives)))
 
@@ -24,10 +26,10 @@ def process_batch_pairs(pairs, data, corpus, word_to_index):
     batch_positives = []
     batch_negatives = []
     for query, positive in pairs:
-        query = merge_title_and_body(corpus[query])
-        batch_querys.append(pad(query, max_length, len(word_to_index)))
-        positive = merge_title_and_body(corpus[positive])
-        batch_positives.append(pad(positive, max_length, len(word_to_index)))
+        query_index_sequence = merge_title_and_body(corpus[query])
+        batch_querys.append(pad(query_index_sequence, max_length, len(word_to_index)))
+        positive_index_sequence = merge_title_and_body(corpus[positive])
+        batch_positives.append(pad(positive_index_sequence, max_length, len(word_to_index)))
         negatives = [merge_title_and_body(corpus[neg]) for neg in data[(query, positive)]]
         negatives = [pad(neg, max_length, len(word_to_index)) for neg in negatives]
         batch_negatives.append(negatives)
@@ -52,10 +54,10 @@ def train_model(model, optimizer, criterion, data,\
         similar_pairs = list(data.train.keys())
         random.shuffle(similar_pairs)
 
-        batches = [process_batch_pairs(similar_pairs[i:i + batch_size], \
-                    data.train, data.corpus, data.word_to_index) \
-                    for i in range(0, len(similar_pairs), batch_size)]
-        for query, positive, negatives in batches:
+        for i in range(0, len(similar_pairs), batch_size):
+            query, positive, negatives = process_batch_pairs(similar_pairs[i:i + batch_size], \
+                                            data.train, data.corpus, data.word_to_index)
+            query, positive, negatives = Variable(query), Variable(positive), Variable(negatives)
             if cuda:
                 query, positive, negatives = \
                     query.cuda(), positive.cuda(), negatives.cuda()
@@ -71,3 +73,4 @@ def train_model(model, optimizer, criterion, data,\
             optimizer.step()
         # Evaluate on the dev set and save the MRR and model parameters
     # Pick the best epoch and return the model from that epoch
+    return 1

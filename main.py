@@ -1,8 +1,11 @@
 from collections import namedtuple
 
+import torch
+
 import data_utils
 import models
 import train_utils
+import helpers
 
 ##############################################################################
 # Settings
@@ -26,17 +29,19 @@ DATA = Data(CORPUS, TRAIN_DATA, DEV_DATA, TEST_DATA,\
 # Train and evaluate the models
 ##############################################################################
 RESULTS = []
-# OPTIMIZER = ...
-# CRITERION = helper.MaxMarginLoss(margin)
-# MAX_EPOCHS = ...
-# BATCH_SIZE = ...
-# MODELS = [models.LSTM(...), models.CNN(...)]
-# for model in MODELS:
-#   (use mean reciprocal rank to determine best epoch)
-#   result =
-#   train_utils.train_model(model, OPTIMIZER, CRITERION, DATA, \
-#                           MAX_EPOCHS, BATCH_SIZE, CUDA)
-#   RESULTS.append(result)
+MARGIN = 1
+CRITERION = helpers.MaxMarginLoss(MARGIN)
+MAX_EPOCHS = 50
+BATCH_SIZE = 16
+FILTER_WIDTH = 3
+POOL_METHOD = "average"
+MODELS = [models.CNN(EMBEDDINGS, FILTER_WIDTH, POOL_METHOD)] # models.LSTM(...)
+for model in MODELS:
+    #  (use mean reciprocal rank to determine best epoch)
+    OPTIMIZER = torch.optim.Adam(model.parameters(), lr=1E-3)
+    result = train_utils.train_model(model, OPTIMIZER, CRITERION, DATA, \
+                                    MAX_EPOCHS, BATCH_SIZE, CUDA)
+    RESULTS.append(result)
 
 ##############################################################################
 # Print out the results and evaluate on the test set

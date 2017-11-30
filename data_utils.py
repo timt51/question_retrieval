@@ -98,4 +98,5 @@ def load_embeddings():
             line = line.rstrip().split(" ")
             word_to_index[line[0]] = index
             embeddings.append(np.array([float(x) for x in line[1:]]))
+    embeddings.append(np.array([0 for _ in range(len(embeddings[0]))]))
     return np.array(embeddings), word_to_index

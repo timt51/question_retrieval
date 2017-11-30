@@ -9,9 +9,8 @@ class LSTM(nn.Module):
         super(LSTM, self).__init__()
 
         vocab_size, embed_dim = embeddings.shape
-        self.embedding_layer = nn.Embedding(vocab_size+1,
-                                            embed_dim,
-                                            padding_idx=vocab_size)
+        self.embedding_layer = nn.Embedding(vocab_size,
+                                            embed_dim)
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
 
     def forward():
@@ -22,22 +21,21 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
 
         vocab_size, embed_dim = embeddings.shape
-        self.embedding_layer = nn.Embedding(vocab_size+1,
-                                            embed_dim,
-                                            padding_idx=vocab_size)
+        self.embedding_layer = nn.Embedding(vocab_size,
+                                            embed_dim)
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
 
-        self.conv2d = nn.Conv2d(1, OUT_CHANNELS, (filter_width, embed_dim))
+        self.conv2d = nn.Conv2d(1, OUT_CHANNELS, (filter_width, embed_dim)).double()
 
         self.pool_method = pool_method
 
     def forward(self, word_indicies):
         embeddings = self.embedding_layer(word_indicies)
-        convolved = self.conv2d(embeddings.unsqueeze(1))
+        convolved = self.conv2d(embeddings.unsqueeze(1).double())
         activation = F.tanh(convolved.squeeze(3))
         if self.pool_method == "max":
-            return torch.max(activation, 3)
+            return torch.max(activation, 2)
         elif self.pool_method == "average":
-            return torch.mean(activation, 3)
+            return torch.mean(activation, 2)
         else:
             raise ValueError("Invalid self.pool_method: " + str(self.pool_method))
