@@ -2,8 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-OUT_CHANNELS = 667
-
 class LSTM(nn.Module):
     def __init__(self, embeddings):
         super(LSTM, self).__init__()
@@ -17,7 +15,7 @@ class LSTM(nn.Module):
         pass
 
 class CNN(nn.Module):
-    def __init__(self, embeddings, filter_width, pool_method):
+    def __init__(self, embeddings, filter_width, pool_method, feature_dim):
         super(CNN, self).__init__()
 
         vocab_size, embed_dim = embeddings.shape
@@ -25,7 +23,7 @@ class CNN(nn.Module):
                                             embed_dim)
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
 
-        self.conv2d = nn.Conv2d(1, OUT_CHANNELS, (filter_width, embed_dim)).double()
+        self.conv2d = nn.Conv2d(1, feature_dim, (filter_width, embed_dim)).double()
 
         self.pool_method = pool_method
 

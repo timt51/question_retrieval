@@ -31,13 +31,13 @@ class MaxMarginLoss(nn.Module):
         # negative_similarities: (negative_query_index, batch_sample_index)
         negative_similarity, _ = torch.max(negative_similarities, dim=0)
         negative_similarity = torch.add(negative_similarity, self.margin)
-        return torch.max(negative_similarity.sub(positive_similarity))
+        return torch.mean(negative_similarity.sub(positive_similarity))
 
 def mean_average_precision():
     pass
 
-def mean_reciprocal_rank():
-    pass
+def mean_reciprocal_rank(positives, candidates_ranked):
+    return 1
 
 def precision_at_n(n):
     pass
