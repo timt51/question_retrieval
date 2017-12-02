@@ -36,8 +36,15 @@ class MaxMarginLoss(nn.Module):
 def mean_average_precision():
     pass
 
-def mean_reciprocal_rank(positives, candidates_ranked):
-    return 1
+def reciprocal_rank(positives, candidates_ranked):
+    # find index of first occurence of one of positives in candidates_ranked
+    positives = set(positives)
+    index = 0
+    while index < len(candidates_ranked):
+        if candidates_ranked[index] in positives:
+            break
+        index += 1
+    return 1.0 / (index + 1)
 
 def precision_at_n(n):
     pass

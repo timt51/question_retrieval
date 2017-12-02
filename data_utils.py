@@ -16,6 +16,14 @@ TEST_DATA_PATH = ASK_UBUNTU_GIT_REPO_PATH + "test.txt"
 PRUNED_EMEDDINGS_PATH = ASK_UBUNTU_GIT_REPO_PATH + \
                         "vector/vectors_pruned.200.txt.gz"
 
+ANDROID_GIT_REPO = "https://github.com/jiangfeng1124/Android"
+ANDROID_GIT_REPO_PATH = "./Android/"
+TOKENIZED_ANDROID_CORPUS_PATH = ANDROID_GIT_REPO_PATH + "corpus.tsv.gz"
+ANDROID_POS_DEV_DATA_PATH = ANDROID_GIT_REPO_PATH + "dev.pos.txt"
+ANDROID_NEG_DEV_DATA_PATH = ANDROID_GIT_REPO_PATH + "dev.neg.txt"
+ANDROID_POS_TEST_DATA_PATH = ANDROID_GIT_REPO_PATH + "test.pos.txt"
+ANDROID_NEG_TEST_DATA_PATH = ANDROID_GIT_REPO_PATH + "test.neg.txt"
+
 CorpusEntry = namedtuple("CorpusEntry", "title body")
 EvalQueryResult = namedtuple("EvalQueryResult", "similar_ids candidate_ids")
 
@@ -100,3 +108,67 @@ def load_embeddings():
             embeddings.append(np.array([float(x) for x in line[1:]]))
     embeddings.append(np.array([0 for _ in range(len(embeddings[0]))]))
     return np.array(embeddings), word_to_index
+
+def download_android_dataset():
+    """
+    Download the dataset if it does not already exists
+    """
+    if not os.path.isdir(ANDROID_GIT_REPO_PATH):
+        try:
+            subprocess.call(["git", "clone", ANDROID_GIT_REPO])
+        except subprocess.SubprocessError:
+            print("Error: May have failed to download the dataset")
+
+def load_android_corpus(word_to_index):
+    """
+    Returns dict: id -> namedtuple(title, body)
+    title and body are encoded as np arrays of indicies using word_to_index.
+    For a token T not in word_to_index, word_to_index[T] = len(word_to_index).
+    """
+    corpus = {}
+    with gzip.open(TOKENIZED_ANDROID_CORPUS_PATH, 'rt', encoding="utf8") as file:
+        for line in file:
+            entry_id, title, body = line.split("\t")
+            entry_id = int(entry_id)
+            title = sequence_to_indicies(title.split(" "), word_to_index)
+            body = sequence_to_indicies(body.split(" "), word_to_index)
+            corpus[entry_id] = CorpusEntry(np.array(title), np.array(body))
+    return corpus
+
+def process_android_eval_data(positive_path, negative_path):
+    """
+    Returns dict: id -> namedtuple(ids_of_similar, ids_of_candidates)
+    """
+    positives = {}
+    with open(positive_path, "rt") as file:
+        for line in file:
+            entry_id, positive = line.split(" ")
+            entry_id, positive = int(entry_id), int(positive)
+            if entry_id not in positives:
+                positives[entry_id] = [positive]
+            else:
+                positives[entry_id].append(positive)
+    negatives = {}
+    with open(negative_path, "rt") as file:
+        for line in file:
+            entry_id, negative = line.split(" ")
+            entry_id, negative = int(entry_id), int(negative)
+            if entry_id not in negatives:
+                negatives[entry_id] = [negative]
+            else:
+                negatives[entry_id].append(negative)
+    data = {}
+    for entry_id in positives:
+        similar_ids = positives[entry_id]
+        candidate_ids = positives[entry_id] + negatives[entry_id]
+        data[entry_id] = EvalQueryResult(similar_ids, candidate_ids)
+    return data
+
+def load_android_eval_data():
+    """
+    Returns dict: id -> namedtuple(ids_of_similar, ids_of_candidates)
+            for dev and test sets
+    """
+    dev_data = process_android_eval_data(ANDROID_POS_DEV_DATA_PATH, ANDROID_NEG_DEV_DATA_PATH)
+    test_data = process_android_eval_data(ANDROID_POS_TEST_DATA_PATH, ANDROID_NEG_TEST_DATA_PATH)
+    return dev_data, test_data

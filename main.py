@@ -10,7 +10,7 @@ import helpers
 ##############################################################################
 # Settings
 ##############################################################################
-CUDA = False
+CUDA = True
 
 ##############################################################################
 # Load the dataset
@@ -26,16 +26,16 @@ DATA = Data(CORPUS, TRAIN_DATA, DEV_DATA, TEST_DATA,\
             EMBEDDINGS, WORD_TO_INDEX)
 
 ##############################################################################
-# Train and evaluate the models
+# Train and evaluate the models for Part 1
 ##############################################################################
 RESULTS = []
 MARGIN = 0.2
 CRITERION = helpers.MaxMarginLoss(MARGIN)
 MAX_EPOCHS = 50
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 FILTER_WIDTH = 2
 POOL_METHOD = "average"
-FEATURE_DIM = 667
+FEATURE_DIM = 300
 MODELS = [models.CNN(EMBEDDINGS, FILTER_WIDTH, POOL_METHOD, FEATURE_DIM)] # models.LSTM(...)
 for model in MODELS:
     #  (use mean reciprocal rank to determine best epoch)
@@ -45,6 +45,6 @@ for model in MODELS:
     RESULTS.append(result)
 
 ##############################################################################
-# Print out the results and evaluate on the test set
+# Print out the results and evaluate on the test set for Part 1
 ##############################################################################
 # Print out the results...
