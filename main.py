@@ -36,7 +36,8 @@ BATCH_SIZE = 32
 FILTER_WIDTH = 2
 POOL_METHOD = "average"
 FEATURE_DIM = 667
-MODELS = [models.CNN(EMBEDDINGS, FILTER_WIDTH, POOL_METHOD, FEATURE_DIM)] # models.LSTM(...)
+NUM_HIDDEN_UNITS = 5
+MODELS = [models.LSTM(EMBEDDINGS, NUM_HIDDEN_UNITS, POOL_METHOD)]  # models.LSTM(...)
 for model in MODELS:
     #  (use mean reciprocal rank to determine best epoch)
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=1E-3)

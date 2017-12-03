@@ -95,7 +95,7 @@ def train_model(model, optimizer, criterion, data,\
             loss = criterion(positive_encoding, negative_encodings, query_encoding)
 
             optimizer.zero_grad()
-            loss.backward()
+            loss.backward(retain_graph=True)
             optimizer.step()
 
             if index % 25 == 24:
