@@ -40,7 +40,7 @@ def process_batch_pairs(pairs, data, corpus, word_to_index):
     return batch_querys, batch_positives, batch_negatives
 
 def evaluate_model(model, data, corpus, word_to_index, cuda):
-    mrrs = []
+    rrs = []
     for query in data.keys():
         positives, candidates = data[query]
 
@@ -56,8 +56,8 @@ def evaluate_model(model, data, corpus, word_to_index, cuda):
         similarities = F.cosine_similarity(encodings[1:],
                                            encodings[0].repeat(len(encodings)-1, 1), dim=1)
         _, candidates_ranked = zip(*sorted(zip(similarities.data, candidates), reverse=True))
-        mrrs.append(helpers.mean_reciprocal_rank(positives, candidates_ranked))
-    return np.mean(mrrs)
+        rrs.append(helpers.reciprocal_rank(positives, candidates_ranked))
+    return np.mean(rrs)
 
 def train_model(model, optimizer, criterion, data,\
                 max_epochs, batch_size, cuda):
@@ -106,6 +106,7 @@ def train_model(model, optimizer, criterion, data,\
         # Evaluate on the dev set and save the MRR and model parameters
         model.eval()
         mrr = evaluate_model(model, data.dev, data.corpus, data.word_to_index, cuda)
+        print(epoch, mrr)
         models_by_epoch.append(Result(model.state_dict(), mrr))
     # Pick the best epoch and return the model from that epoch
     best_state_dict = sorted(models_by_epoch, key=lambda x: x.mrr, reverse=True)[0]
