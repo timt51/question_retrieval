@@ -10,7 +10,7 @@ import helpers
 ##############################################################################
 # Settings
 ##############################################################################
-CUDA = True
+CUDA = False
 
 ##############################################################################
 # Load the dataset
@@ -37,9 +37,11 @@ FILTER_WIDTH = 3
 POOL_METHOD = "average"
 FEATURE_DIM = 667
 DROPOUT_P = 0.2
+NUM_HIDDEN_UNITS = 240
 MODELS = [
-    models.CNN(EMBEDDINGS, FILTER_WIDTH, POOL_METHOD, FEATURE_DIM, DROPOUT_P)
-    ] # models.LSTM(...)
+    models.LSTM(EMBEDDINGS, NUM_HIDDEN_UNITS, POOL_METHOD, CUDA)
+    # models.CNN(EMBEDDINGS, FILTER_WIDTH, POOL_METHOD, FEATURE_DIM, DROPOUT_P)
+    ]
 LEARNING_RATE = 1E-3 # 1E-3, 3E-4
 for model in MODELS:
     #  (use mean reciprocal rank to determine best epoch)

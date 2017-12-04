@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import helpers
 
 NEGATIVE_QUERYS_PER_SAMPLE = 20
-MAX_LENGTH = 100
+MAX_LENGTH = 30
 
 Result = namedtuple("Result", "state_dict mrr")
 
