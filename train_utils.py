@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import helpers
 
 NEGATIVE_QUERYS_PER_SAMPLE = 20
-MAX_LENGTH = 100
+MAX_LENGTH = 30
 
 Result = namedtuple("Result", "state_dict mrr")
 
@@ -95,13 +95,13 @@ def train_model(model, optimizer, criterion, data,\
             loss = criterion(positive_encoding, negative_encodings, query_encoding)
 
             optimizer.zero_grad()
-            loss.backward(retain_graph=True)
+            loss.backward()
             optimizer.step()
 
-            if index % 25 == 24:
+            if index % 50 == 49:
                 print("Average loss: " + str(np.mean(losses)))
                 losses = []
-            losses.append(loss)
+            losses.append(loss.data)
 
         # Evaluate on the dev set and save the MRR and model parameters
         model.eval()
