@@ -10,7 +10,7 @@ import helpers
 ##############################################################################
 # Settings
 ##############################################################################
-CUDA = False
+CUDA = True
 
 ##############################################################################
 # Load the dataset
@@ -42,7 +42,7 @@ MODELS = [
     models.LSTM(EMBEDDINGS, NUM_HIDDEN_UNITS, POOL_METHOD, CUDA)
     # models.CNN(EMBEDDINGS, FILTER_WIDTH, POOL_METHOD, FEATURE_DIM, DROPOUT_P)
     ]
-LEARNING_RATE = 1E-3 # 1E-3, 3E-4
+LEARNING_RATE = 3E-4 # 1E-3, 3E-4
 for model in MODELS:
     #  (use mean reciprocal rank to determine best epoch)
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)

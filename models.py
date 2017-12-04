@@ -10,18 +10,23 @@ class LSTM(nn.Module):
         vocab_size, embed_dim = embeddings.shape
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim)
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
-        self.lstm = nn.LSTM(embed_dim, hidden_units, batch_first=True)  # Input dim is 3, output dim is 3
+        self.lstm = nn.LSTM(embed_dim, hidden_units, batch_first=True, bidirectional=False)  # Input dim is 3, output dim is 3
         self.hidden_dim = hidden_units
         self.pool_method = pool_method
-        self.cudaOn = cuda
+        self.cuda_on = cuda
+        self.bidirectional = False
 
     def init_hidden(self, sz):
-        if self.cudaOn:
-            return (autograd.Variable(torch.zeros(1, sz, self.hidden_dim)).cuda(),
-                    autograd.Variable(torch.zeros(1, sz, self.hidden_dim)).cuda())
+        if self.bidirectional:
+            factor = 2
         else:
-            return (autograd.Variable(torch.zeros(1, sz, self.hidden_dim)),
-                    autograd.Variable(torch.zeros(1, sz, self.hidden_dim)))
+            factor = 1
+        if self.cuda_on:
+            return (autograd.Variable(torch.zeros(factor, sz, self.hidden_dim)).cuda(),
+                    autograd.Variable(torch.zeros(factor, sz, self.hidden_dim)).cuda())
+        else:
+            return (autograd.Variable(torch.zeros(factor, sz, self.hidden_dim)),
+                    autograd.Variable(torch.zeros(factor, sz, self.hidden_dim)))
 
     def forward(self, word_indices):
         # alternatively, we can do the entire sequence all at once.

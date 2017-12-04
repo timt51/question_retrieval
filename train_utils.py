@@ -10,7 +10,7 @@ import torch.nn.functional as F
 import helpers
 
 NEGATIVE_QUERYS_PER_SAMPLE = 20
-MAX_LENGTH = 30
+MAX_LENGTH = 100
 
 Result = namedtuple("Result", "state_dict mrr")
 
@@ -70,6 +70,8 @@ def train_model(model, optimizer, criterion, data,\
         model = model.cuda()
 
     models_by_epoch = []
+    max_mrr = 0
+    models_since_max_mrr = -1
     for epoch in tqdm(range(max_epochs)):
         model.train()
         similar_pairs = list(data.train.keys())
@@ -108,6 +110,13 @@ def train_model(model, optimizer, criterion, data,\
         mrr = evaluate_model(model, data.dev, data.corpus, data.word_to_index, cuda)
         print(epoch, mrr)
         models_by_epoch.append(Result(model.state_dict(), mrr))
+        if mrr > max_mrr:
+            max_mrr = mrr
+            models_since_max_mrr = 0
+        else:
+            models_since_max_mrr += 1
+        if models_since_max_mrr > 3:
+            break
     # Pick the best epoch and return the model from that epoch
     best_state_dict = sorted(models_by_epoch, key=lambda x: x.mrr, reverse=True)[0]
     model.load_state_dict(best_state_dict)
