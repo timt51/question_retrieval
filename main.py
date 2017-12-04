@@ -29,17 +29,21 @@ DATA = Data(CORPUS, TRAIN_DATA, DEV_DATA, TEST_DATA,\
 # Train and evaluate the models for Part 1
 ##############################################################################
 RESULTS = []
-MARGIN = 0.2
+MARGIN = 0.5
 CRITERION = helpers.MaxMarginLoss(MARGIN)
 MAX_EPOCHS = 50
-BATCH_SIZE = 128
-FILTER_WIDTH = 2
+BATCH_SIZE = 32
+FILTER_WIDTH = 3
 POOL_METHOD = "average"
-FEATURE_DIM = 300
-MODELS = [models.CNN(EMBEDDINGS, FILTER_WIDTH, POOL_METHOD, FEATURE_DIM)] # models.LSTM(...)
+FEATURE_DIM = 667
+DROPOUT_P = 0.2
+MODELS = [
+    models.CNN(EMBEDDINGS, FILTER_WIDTH, POOL_METHOD, FEATURE_DIM, DROPOUT_P)
+    ] # models.LSTM(...)
+LEARNING_RATE = 1E-3 # 1E-3, 3E-4
 for model in MODELS:
     #  (use mean reciprocal rank to determine best epoch)
-    OPTIMIZER = torch.optim.Adam(model.parameters(), lr=1E-3)
+    OPTIMIZER = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     result = train_utils.train_model(model, OPTIMIZER, CRITERION, DATA, \
                                     MAX_EPOCHS, BATCH_SIZE, CUDA)
     RESULTS.append(result)
