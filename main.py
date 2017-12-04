@@ -32,12 +32,12 @@ RESULTS = []
 MARGIN = 0.2
 CRITERION = helpers.MaxMarginLoss(MARGIN)
 MAX_EPOCHS = 50
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 FILTER_WIDTH = 2
 POOL_METHOD = "average"
 FEATURE_DIM = 667
-NUM_HIDDEN_UNITS = 5
-MODELS = [models.LSTM(EMBEDDINGS, NUM_HIDDEN_UNITS, POOL_METHOD)]  # models.LSTM(...)
+NUM_HIDDEN_UNITS = 240
+MODELS = [models.LSTM(EMBEDDINGS, NUM_HIDDEN_UNITS, POOL_METHOD, CUDA)]  # models.LSTM(...)
 for model in MODELS:
     #  (use mean reciprocal rank to determine best epoch)
     OPTIMIZER = torch.optim.Adam(model.parameters(), lr=1E-3)

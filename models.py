@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torch.autograd as autograd
 
 class LSTM(nn.Module):
-    def __init__(self, embeddings, hidden_units, pool_method):
+    def __init__(self, embeddings, hidden_units, pool_method, cuda):
         super(LSTM, self).__init__()
 
         vocab_size, embed_dim = embeddings.shape
@@ -13,11 +13,15 @@ class LSTM(nn.Module):
         self.lstm = nn.LSTM(embed_dim, hidden_units, batch_first=True)  # Input dim is 3, output dim is 3
         self.hidden_dim = hidden_units
         self.pool_method = pool_method
-        self.hidden =  self.init_hidden()
+        self.cudaOn = cuda
 
-    def init_hidden(self):
-        return (autograd.Variable(torch.zeros(1, 1, self.hidden_dim)),
-                autograd.Variable(torch.zeros(1, 1, self.hidden_dim)))
+    def init_hidden(self, sz):
+        if self.cudaOn:
+            return (autograd.Variable(torch.zeros(1, sz, self.hidden_dim)).cuda(),
+                    autograd.Variable(torch.zeros(1, sz, self.hidden_dim)).cuda())
+        else:
+            return (autograd.Variable(torch.zeros(1, sz, self.hidden_dim)),
+                    autograd.Variable(torch.zeros(1, sz, self.hidden_dim)))
 
     def forward(self, word_indices):
         # alternatively, we can do the entire sequence all at once.
@@ -25,11 +29,12 @@ class LSTM(nn.Module):
         # the sequence. the second is just the most recent hidden state
         # Add the extra 2nd dimension
         embeddings = self.embedding_layer(word_indices)
-        lstm_out, self.hidden = self.lstm(embeddings.float(), self.hidden)
+        hidden = self.init_hidden(embeddings.size(0))
+        lstm_out, hidden = self.lstm(embeddings.float(), hidden)
         if self.pool_method == "max":
-            return self.hidden
+            return hidden
         elif self.pool_method == "average":
-            return torch.mean(lstm_out, 2)
+            return torch.mean(lstm_out, 1)
         else:
             raise ValueError("Invalid self.pool_method: " + str(self.pool_method))
 
