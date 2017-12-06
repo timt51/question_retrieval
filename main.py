@@ -1,4 +1,5 @@
 from collections import namedtuple
+import itertools
 
 import torch
 
@@ -29,28 +30,56 @@ DATA = Data(CORPUS, TRAIN_DATA, DEV_DATA, TEST_DATA,\
 # Train and evaluate the models for Part 1
 ##############################################################################
 RESULTS = []
-MARGIN = 0.5
-CRITERION = helpers.MaxMarginLoss(MARGIN)
+MARGINS = [0.2, 0.4, 0.5, 0.6, 0.8]
 MAX_EPOCHS = 50
 BATCH_SIZE = 32
-FILTER_WIDTH = 3
+FILTER_WIDTHS = [3]
 POOL_METHOD = "average"
-FEATURE_DIM = 667
-DROPOUT_P = 0.2
-NUM_HIDDEN_UNITS = 240
-MODELS = [
-    models.LSTM(EMBEDDINGS, NUM_HIDDEN_UNITS, POOL_METHOD, CUDA)
-    # models.CNN(EMBEDDINGS, FILTER_WIDTH, POOL_METHOD, FEATURE_DIM, DROPOUT_P)
-    ]
-LEARNING_RATE = 3E-4 # 1E-3, 3E-4
-for model in MODELS:
-    #  (use mean reciprocal rank to determine best epoch)
-    OPTIMIZER = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
-    result = train_utils.train_model(model, OPTIMIZER, CRITERION, DATA, \
+FEATURE_DIMS = [600, 667]
+DROPOUT_PS = [0.1, 0.2, 0.3]
+NUM_HIDDEN_UNITS = [150, 200, 240, 280, 350]
+LEARNING_RATES = [3E-4, 1E-3]
+MODELS = []
+##############################################################################
+# LSTM_HYPERPARAMETERS = itertools.product(MARGINS, NUM_HIDDEN_UNITS, LEARNING_RATES)
+# for margin, num_hidden_units, learning_rate in LSTM_HYPERPARAMETERS:
+#     model = models.LSTM(EMBEDDINGS, num_hidden_units, POOL_METHOD, CUDA)
+#     criterion = helpers.MaxMarginLoss(margin)
+#     optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+#     model, mrr = train_utils.train_model(model, optimizer, criterion, DATA, \
+#                                     MAX_EPOCHS, BATCH_SIZE, CUDA)
+#     torch.save(model.state_dict(), "./models/lstm_" +
+#                                     str(margin) + "_" +
+#                                     str(num_hidden_units) + "_" +
+#                                     str(learning_rate))
+#     MODELS.append((mrr, margin, num_hidden_units, learning_rate))
+##############################################################################
+CNN_HYPERPARAMETERS = itertools.product(MARGINS, FILTER_WIDTHS, FEATURE_DIMS, 
+                                        DROPOUT_PS, LEARNING_RATES)
+for margin, filter_width, feature_dim, dropout_p, learning_rate in CNN_HYPERPARAMETERS:
+    model = models.CNN(EMBEDDINGS, filter_width, POOL_METHOD, feature_dim, dropout_p)
+    criterion = helpers.MaxMarginLoss(margin)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+    model, mrr = train_utils.train_model(model, optimizer, criterion, DATA, \
                                     MAX_EPOCHS, BATCH_SIZE, CUDA)
-    RESULTS.append(result)
+    torch.save(model.state_dict(), "./models/cnn_" +
+                                    str(margin) + "_" +
+                                    str(filter_width) + "_" +
+                                    str(feature_dim) + "_" +
+                                    str(dropout_p) + "_" +
+                                    str(learning_rate))
+    print("should have saved", "./models/cnn_" +
+                                    str(margin) + "_" +
+                                    str(filter_width) + "_" +
+                                    str(feature_dim) + "_" +
+                                    str(dropout_p) + "_" +
+                                    str(learning_rate))
+    MODELS.append((mrr, margin, filter_width, feature_dim, dropout_p, learning_rate))
 
 ##############################################################################
 # Print out the results and evaluate on the test set for Part 1
 ##############################################################################
 # Print out the results...
+MODELS = sorted(MODELS, key=lambda x: x[0], reverse=True)
+for model in MODELS:
+    print(model)
