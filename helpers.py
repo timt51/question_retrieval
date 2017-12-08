@@ -31,7 +31,8 @@ class MaxMarginLoss(nn.Module):
         # negative_similarities: (negative_query_index, batch_sample_index)
         negative_similarity, _ = torch.max(negative_similarities, dim=0)
         negative_similarity = torch.add(negative_similarity, self.margin)
-        return torch.mean(negative_similarity.sub(positive_similarity))
+        negative_similarity = torch.clamp(negative_similarity.sub(positive_similarity), min=0)
+        return torch.mean(negative_similarity)
 
 def recall(relevant, retrieved):
     """

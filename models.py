@@ -4,20 +4,29 @@ import torch.nn.functional as F
 import torch.autograd as autograd
 
 class LSTM(nn.Module):
-    def __init__(self, embeddings, hidden_units, pool_method):
+    def __init__(self, embeddings, hidden_units, pool_method, cuda):
         super(LSTM, self).__init__()
 
         vocab_size, embed_dim = embeddings.shape
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim)
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
-        self.lstm = nn.LSTM(embed_dim, hidden_units, batch_first=True)  # Input dim is 3, output dim is 3
+        self.lstm = nn.LSTM(embed_dim, hidden_units, batch_first=True, bidirectional=False)  # Input dim is 3, output dim is 3
         self.hidden_dim = hidden_units
         self.pool_method = pool_method
-        self.hidden =  self.init_hidden()
+        self.cuda_on = cuda
+        self.bidirectional = False
 
-    def init_hidden(self):
-        return (autograd.Variable(torch.zeros(1, 1, self.hidden_dim)),
-                autograd.Variable(torch.zeros(1, 1, self.hidden_dim)))
+    def init_hidden(self, sz):
+        if self.bidirectional:
+            factor = 2
+        else:
+            factor = 1
+        if self.cuda_on:
+            return (autograd.Variable(torch.zeros(factor, sz, self.hidden_dim)).cuda(),
+                    autograd.Variable(torch.zeros(factor, sz, self.hidden_dim)).cuda())
+        else:
+            return (autograd.Variable(torch.zeros(factor, sz, self.hidden_dim)),
+                    autograd.Variable(torch.zeros(factor, sz, self.hidden_dim)))
 
     def forward(self, word_indices):
         # alternatively, we can do the entire sequence all at once.
@@ -25,11 +34,12 @@ class LSTM(nn.Module):
         # the sequence. the second is just the most recent hidden state
         # Add the extra 2nd dimension
         embeddings = self.embedding_layer(word_indices)
-        lstm_out, self.hidden = self.lstm(embeddings.float(), self.hidden)
+        hidden = self.init_hidden(embeddings.size(0))
+        lstm_out, hidden = self.lstm(embeddings.float(), hidden)
         if self.pool_method == "max":
-            return self.hidden
+            return hidden
         elif self.pool_method == "average":
-            return torch.mean(lstm_out, 2)
+            return torch.mean(lstm_out, 1)
         else:
             raise ValueError("Invalid self.pool_method: " + str(self.pool_method))
 
@@ -37,7 +47,7 @@ class LSTM(nn.Module):
         # TODO: implement me!!
 
 class CNN(nn.Module):
-    def __init__(self, embeddings, filter_width, pool_method, feature_dim):
+    def __init__(self, embeddings, filter_width, pool_method, feature_dim, dropout_p):
         super(CNN, self).__init__()
 
         vocab_size, embed_dim = embeddings.shape
@@ -47,12 +57,15 @@ class CNN(nn.Module):
 
         self.conv2d = nn.Conv2d(1, feature_dim, (filter_width, embed_dim)).double()
 
+        self.dropout = nn.Dropout2d(p=dropout_p)
+
         self.pool_method = pool_method
 
     def forward(self, word_indicies):
         embeddings = self.embedding_layer(word_indicies)
         convolved = self.conv2d(embeddings.unsqueeze(1).double())
         activation = F.tanh(convolved.squeeze(3))
+        activation = self.dropout(activation)
         if self.pool_method == "max":
             return torch.max(activation, 2)
         elif self.pool_method == "average":

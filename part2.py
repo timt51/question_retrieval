@@ -1,6 +1,7 @@
 from collections import namedtuple
 
 import torch
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 import data_utils
 import models
@@ -37,7 +38,12 @@ ANDROID_DATA = Data(ANDROID_CORPUS, None,\
 ##############################################################################
 # Train and evaluate a baseline TFIDF model
 ##############################################################################
-
+TOKENIZED_ANDROID_CORPUS = data_utils.load_tokenized_android_corpus(WORD_TO_INDEX)
+TOKENIZED_ANDROID_CORPUS = [
+    entry.title + entry.body for entry in TOKENIZED_ANDROID_CORPUS.values()
+]
+TFIDF_VECTORIZER = TfidfVectorizer()
+TFIDF_VECTORS = TFIDF_VECTORIZER.fit_transform(TOKENIZED_ANDROID_CORPUS)
 
 ##############################################################################
 # Train and evaluate the models for Part 2
@@ -46,7 +52,7 @@ RESULTS = []
 MARGIN = 0.2
 CRITERION = helpers.MaxMarginLoss(MARGIN)
 MAX_EPOCHS = 50
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 FILTER_WIDTH = 2
 POOL_METHOD = "average"
 FEATURE_DIM = 300

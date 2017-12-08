@@ -172,3 +172,17 @@ def load_android_eval_data():
     dev_data = process_android_eval_data(ANDROID_POS_DEV_DATA_PATH, ANDROID_NEG_DEV_DATA_PATH)
     test_data = process_android_eval_data(ANDROID_POS_TEST_DATA_PATH, ANDROID_NEG_TEST_DATA_PATH)
     return dev_data, test_data
+
+def load_tokenized_android_corpus(word_to_index):
+    """
+    Returns dict: id -> namedtuple(title, body)
+    title and body are encoded as np arrays of indicies using word_to_index.
+    For a token T not in word_to_index, word_to_index[T] = len(word_to_index).
+    """
+    corpus = {}
+    with gzip.open(TOKENIZED_ANDROID_CORPUS_PATH, 'rt', encoding="utf8") as file:
+        for line in file:
+            entry_id, title, body = line.split("\t")
+            entry_id = int(entry_id)
+            corpus[entry_id] = CorpusEntry(title.join(" "), body.join(" "))
+    return corpus
