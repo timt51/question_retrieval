@@ -72,3 +72,14 @@ class CNN(nn.Module):
             return torch.mean(activation, 2)
         else:
             raise ValueError("Invalid self.pool_method: " + str(self.pool_method))
+
+class BinaryClassifier(nn.Module):
+    def __init__(self, question_encoding_size, num_hidden_units):
+        super(BinaryClassifier, self).__init__()
+        self.fc1 = nn.Linear(question_encoding_size, num_hidden_units)
+        self.o = nn.Linear
+
+    def forward(self, x):
+        z = self.fc1(x)
+        a = F.relu(z)
+        return F.log_softmax(a)
