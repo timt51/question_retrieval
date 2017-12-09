@@ -51,8 +51,8 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
 
         vocab_size, embed_dim = embeddings.shape
-        self.embedding_layer = nn.Embedding(vocab_size,
-                                            embed_dim)
+        self.embedding_layer = nn.Embedding(vocab_size, embed_dim)
+
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
 
         self.conv2d = nn.Conv2d(1, feature_dim, (filter_width, embed_dim)).double()
@@ -74,12 +74,19 @@ class CNN(nn.Module):
             raise ValueError("Invalid self.pool_method: " + str(self.pool_method))
 
 class BinaryClassifier(nn.Module):
-    def __init__(self, question_encoding_size, num_hidden_units):
+    def __init__(self, embeddings, question_encoding_size, num_hidden_units):
         super(BinaryClassifier, self).__init__()
+
+        vocab_size, embed_dim = embeddings.shape
+        self.embedding_layer = nn.Embedding(vocab_size, embed_dim)
+
+        self.embedding_layer.weight.data = torch.from_numpy(embeddings)
+
         self.fc1 = nn.Linear(question_encoding_size, num_hidden_units)
         self.o = nn.Linear
 
-    def forward(self, x):
-        z = self.fc1(x)
+    def forward(self, word_indicies):
+        embeddings = self.embedding_layer(word_indicies)
+        z = self.fc1(embeddings)
         a = F.relu(z)
         return F.log_softmax(a)
