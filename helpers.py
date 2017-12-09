@@ -34,8 +34,64 @@ class MaxMarginLoss(nn.Module):
         negative_similarity = torch.clamp(negative_similarity.sub(positive_similarity), min=0)
         return torch.mean(negative_similarity)
 
-def mean_average_precision():
-    pass
+def recall(relevant, retrieved):
+    """
+    Computes the recall value for the set of retrieved elements
+    against the set of relevant documents
+
+    :param relevant: a set of desired documents
+    :param retrieved: a set of retrieved documents
+    :return: the precision rate, a real number from [0,1]
+    """
+    num_in_common = float(len(relevant & retrieved))
+    return num_in_common / len(relevant)
+
+
+def precision(relevant, retrieved):
+    """
+    Computes the precision value for the set of retrieved elements
+    against the set of relevant documents
+
+    :param relevant: a set of desired documents
+    :param retrieved: a set of retrieved documents
+    :return: the precision rate, a real number from [0,1]
+    """
+    num_in_common = float(len(relevant & retrieved))
+    return num_in_common / len(retrieved)
+
+
+def is_relevant(doc, relevant):
+    """
+    An indicator function to indicate whether the element doc
+    is in the set of relevant docs
+
+    :param doc: the document in question
+    :param relevant: the set of relevant documents
+    :return: 1 if the doc is in the set of relevant docs, 0
+    otherwise
+    """
+    return 1 if doc in relevant else 0
+
+
+def mean_average_precision(positives, candidates_ranked):
+    """
+    Computes the average of each of the precision values
+    computed for the top  k documents for k = 1 to k = all
+
+    :param positives: the set of similar documents
+    :param candidates_ranked: a list of questions sorted
+    in descending order by rank
+    :return: the map, a real number from [0,1]
+    """
+    postives_as_set = set(positives)
+    at_or_below_cutoff = set()
+    total_precision = 0
+    for candidate in candidates_ranked:
+        at_or_below_cutoff.add(candidate)
+        total_precision += precision(postives_as_set, at_or_below_cutoff) \
+                           * is_relevant(candidate, postives_as_set)
+    ave_precision = total_precision / len(postives_as_set)
+    return ave_precision
 
 def reciprocal_rank(positives, candidates_ranked):
     # find index of first occurence of one of positives in candidates_ranked
@@ -47,5 +103,17 @@ def reciprocal_rank(positives, candidates_ranked):
         index += 1
     return 1.0 / (index + 1)
 
-def precision_at_n(n):
-    pass
+def precision_at_n(positives, candidates_ranked, n):
+    """
+    Computes the precision value of the top n ranked candidates
+    against the set of relevant documents
+
+    :param positives: the set of similar documents
+    :param candidates_ranked: a list of questions sorted
+    in descending order by rank
+    :param n: consider the top n ranked questions
+    :return: p@n, a real number from [0,1]
+    """
+    positives_as_set = set(positives)
+    at_or_below_rank_n = set(candidates_ranked[:n+1])
+    return precision(positives_as_set, at_or_below_rank_n)
