@@ -1,5 +1,6 @@
 import random
 from collections import namedtuple
+from copy import deepcopy
 
 from tqdm import tqdm
 import numpy as np
@@ -39,7 +40,7 @@ def process_batch_pairs(pairs, data, corpus, word_to_index):
     batch_negatives = torch.from_numpy(np.array(batch_negatives))
     return batch_querys, batch_positives, batch_negatives
 
-def evaluate_model(model, data, corpus, word_to_index, cuda):
+def evaluate_model(model, data, corpus, word_to_index, cuda, eval_func):
     rrs = []
     for query in data.keys():
         positives, candidates = data[query]
@@ -56,7 +57,7 @@ def evaluate_model(model, data, corpus, word_to_index, cuda):
         similarities = F.cosine_similarity(encodings[1:],
                                            encodings[0].repeat(len(encodings)-1, 1), dim=1)
         _, candidates_ranked = zip(*sorted(zip(similarities.data, candidates), reverse=True))
-        rrs.append(helpers.reciprocal_rank(positives, candidates_ranked))
+        rrs.append(eval_func(positives, candidates_ranked))
     return np.mean(rrs)
 
 def train_model(model, optimizer, criterion, data,\
@@ -107,9 +108,10 @@ def train_model(model, optimizer, criterion, data,\
 
         # Evaluate on the dev set and save the MRR and model parameters
         model.eval()
-        mrr = evaluate_model(model, data.dev, data.corpus, data.word_to_index, cuda)
+        mrr = evaluate_model(model, data.dev, data.corpus, data.word_to_index, cuda, helpers.reciprocal_rank)
         print(epoch, mrr)
-        models_by_epoch.append(Result(model.state_dict(), mrr))
+        cpu_model = model
+        models_by_epoch.append(Result(cpu_model.state_dict(), mrr))
         if mrr > max_mrr:
             max_mrr = mrr
             models_since_max_mrr = 0
