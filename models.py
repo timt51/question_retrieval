@@ -85,8 +85,8 @@ class BinaryClassifier(nn.Module):
         self.fc1 = nn.Linear(question_encoding_size, num_hidden_units)
         self.o = nn.Linear
 
-    def forward(self, word_indicies):
-        embeddings = self.embedding_layer(word_indicies)
+    def forward(self, word_indices):
+        embeddings = self.embedding_layer(word_indices)
         z = self.fc1(embeddings)
         a = F.relu(z)
         return F.log_softmax(a)

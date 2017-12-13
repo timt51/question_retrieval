@@ -1,11 +1,13 @@
 from collections import namedtuple
+import itertools
 
 import torch
 from sklearn.feature_extraction.text import TfidfVectorizer
+import torch.nn.functional as F
 
 import data_utils
-import models
-import train_utils
+from models import BinaryClassifier
+import part2_train_utils
 import helpers
 
 ##############################################################################
@@ -38,33 +40,39 @@ ANDROID_DATA = Data(ANDROID_CORPUS, None,\
 ##############################################################################
 # Train and evaluate a baseline TFIDF model
 ##############################################################################
-TOKENIZED_ANDROID_CORPUS = data_utils.load_tokenized_android_corpus(WORD_TO_INDEX)
-TOKENIZED_ANDROID_CORPUS = [
-    entry.title + entry.body for entry in TOKENIZED_ANDROID_CORPUS.values()
-]
-TFIDF_VECTORIZER = TfidfVectorizer()
-TFIDF_VECTORS = TFIDF_VECTORIZER.fit_transform(TOKENIZED_ANDROID_CORPUS)
+                                # TOKENIZED_ANDROID_CORPUS = data_utils.load_tokenized_android_corpus(WORD_TO_INDEX)
+                                # TOKENIZED_ANDROID_CORPUS = [
+                                #     entry.title + entry.body for entry in TOKENIZED_ANDROID_CORPUS.values()
+                                # ]
+                                # TFIDF_VECTORIZER = TfidfVectorizer()
+                                # TFIDF_VECTORS = TFIDF_VECTORIZER.fit_transform(TOKENIZED_ANDROID_CORPUS)
 
 ##############################################################################
 # Train and evaluate the models for Part 2
 ##############################################################################
 RESULTS = []
-MARGIN = 0.2
-CRITERION = helpers.MaxMarginLoss(MARGIN)
+MARGIN = ["""TODO"""]
 MAX_EPOCHS = 50
 BATCH_SIZE = 64
 FILTER_WIDTH = 2
 POOL_METHOD = "average"
 FEATURE_DIM = 300
-MODELS = [models.CNN(EMBEDDINGS, FILTER_WIDTH, POOL_METHOD, FEATURE_DIM)] # models.LSTM(...)
-for model in MODELS:
-    #  (use mean reciprocal rank to determine best epoch)
-    OPTIMIZER = torch.optim.Adam(model.parameters(), lr=1E-3)
-    result = train_utils.train_model(model, OPTIMIZER, CRITERION, DATA, \
-                                    MAX_EPOCHS, BATCH_SIZE, CUDA)
-    RESULTS.append(result)
+DIS_NUM_HIDDEN_UNITS = ["""TODO"""]
+DIS_LEARNING_RATES = ["""TODO"""]
+DIS_TRADE_OFF_RATES = ["""TODO"""]
+ENCODER_MODELS = ["""TODO"""]
 
-##############################################################################
-# Print out the results and evaluate on the test set for Part 2
-##############################################################################
-# Print out the results...
+DIS_HYPERPARAMETERS = itertools.product(DIS_LEARNING_RATES, DIS_NUM_HIDDEN_UNITS, DIS_TRADE_OFF_RATES, ENCODER_MODELS)
+
+for learning_rate, num_hidden_units, trade_off, enc_model in DIS_HYPERPARAMETERS:
+    dis_model = BinaryClassifier(EMBEDDINGS, FEATURE_DIM, num_hidden_units)
+    model, mrr = part2_train_utils.train_model(
+        enc_model,
+        dis_model,
+        trade_off,
+        ASK_UBUNTU_DATA,
+        ANDROID_DATA,
+        MAX_EPOCHS,
+        BATCH_SIZE,
+        CUDA
+    )
