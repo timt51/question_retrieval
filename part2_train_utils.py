@@ -7,15 +7,19 @@ import torch
 from torch.autograd import Variable
 import torch.nn.functional as F
 
-from train_utils import process_batch_pairs, NEGATIVE_QUERYS_PER_SAMPLE
+from train_utils import process_batch_pairs, NEGATIVE_QUERYS_PER_SAMPLE, pad, merge_title_and_body
 from helpers import MaxMarginLoss as MML
+from meter import AUCMeter
 
 Result = namedtuple("Result", "state_dict auc")
 TrainerPack = namedtuple("TrainerPack", "model optimizer criterion")
 SOURCE_LABEL = 0
 TARGET_LABEL = 1
+IS_SIMMILAR_LABEL = 1
+NOT_SIMMILAR_LABEL = 0
 TARGET_QUERIES_PER_SAMPLE = NEGATIVE_QUERYS_PER_SAMPLE
 SOURCE_QUERIES_PER_SAMPLE = NEGATIVE_QUERYS_PER_SAMPLE
+MAXIMUM_FALSE_POSITIVE_RATIO = 0.05
 
 def discriminator_model_loss(dis_model, target_data, source_data):
     target_qs = torch.from_numpy(target_data)
@@ -28,7 +32,27 @@ def discriminator_model_loss(dis_model, target_data, source_data):
     return F.nll_loss(input, labels)
 
 
-# TODO: create the evaluation function to evaluate the enc_models performance
+def evaluate_model(model, data, corpus, word_to_index, cuda):
+    auc = AUCMeter()
+    for query in data.keys():
+        positives = set(data[query][0])
+        candidates = data[query][1]
+
+        embeddings = [pad(merge_title_and_body(corpus[query]), len(word_to_index))]
+        targets = [IS_SIMMILAR_LABEL]
+        for candidate in candidates:
+            embeddings.append(pad(merge_title_and_body(corpus[candidate]), len(word_to_index)))
+            targets.append(IS_SIMMILAR_LABEL if candidate in positives else NOT_SIMMILAR_LABEL)
+        embeddings = Variable(torch.from_numpy(np.array(embeddings)))
+        if cuda:
+            embeddings = embeddings.cuda()
+
+        encodings = model(embeddings)
+        query_encoding = encodings[0]
+        candidate_encodings = encodings[1:]
+        similarities = (F.cosine_similarity(candidate_encodings, query_encoding.repeat(len(encodings)-1, 1), dim=1))
+        auc.add(similarities.data, targets)
+    return auc.value(MAXIMUM_FALSE_POSITIVE_RATIO)
 
 def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
                 max_epochs, batch_size, enc_lr, dis_lr, cuda):
