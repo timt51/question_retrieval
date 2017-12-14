@@ -21,13 +21,11 @@ TARGET_QUERIES_PER_SAMPLE = NEGATIVE_QUERYS_PER_SAMPLE
 SOURCE_QUERIES_PER_SAMPLE = NEGATIVE_QUERYS_PER_SAMPLE
 MAXIMUM_FALSE_POSITIVE_RATIO = 0.05
 
-def discriminator_model_loss(dis_model, target_data, source_data):
-    target_qs = torch.from_numpy(target_data)
-    source_qs = torch.from_numpy(source_data)
+def discriminator_model_loss(dis_model, target_qs, source_qs):
     all_qs = torch.cat((target_qs, source_qs), dim=0)
-    input = torch.stack([dis_model(all_qs[:, i].long()) for i in range(all_qs.shape[1])])
+    input = torch.stack([dis_model(all_qs[:, i]) for i in range(all_qs.data.shape[1])], dim=1)
     labels = torch.from_numpy(
-        np.array([SOURCE_LABEL] * source_qs.shape[1] + [TARGET_LABEL] * target_qs.shape[1])
+        np.array([SOURCE_LABEL]*source_qs.data.shape[0] + [TARGET_LABEL]*target_qs.data.shape[0])
     )
     return F.nll_loss(input, labels)
 
@@ -54,6 +52,15 @@ def evaluate_model(model, data, corpus, word_to_index, cuda):
         auc.add(similarities.data, targets)
     return auc.value(MAXIMUM_FALSE_POSITIVE_RATIO)
 
+
+def get_android_batch(batch_size, corpus, word_to_index):
+    embedded = []
+    for _ in range(batch_size):
+        query_index_sequences = [merge_title_and_body(corpus.pop()) for _ in range(TARGET_QUERIES_PER_SAMPLE)]
+        embedded.append([pad(seq, len(word_to_index)) for seq in query_index_sequences])
+    android_batch = torch.from_numpy(np.array(embedded))
+    return android_batch
+
 def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
                 max_epochs, batch_size, enc_lr, dis_lr, cuda):
     """
@@ -73,8 +80,8 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
         dis_model.train()
         similar_pairs = list(source_data.train.keys())
         random.shuffle(similar_pairs)
-        andriod_queries = list(target_data.corpus.values())
-        random.shuffle(andriod_queries)
+        android_queries = list(target_data.corpus.values())
+        random.shuffle(android_queries)
 
         enc_losses = []
         for _, i in enumerate(tqdm(range(0, len(similar_pairs), batch_size))):
@@ -84,9 +91,21 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
                 source_data.corpus,
                 source_data.word_to_index
             )
-            query, positive, negatives = Variable(query), Variable(positive), Variable(negatives)
+            androids = get_android_batch(
+                batch_size,
+                android_queries,
+                target_data.word_to_index
+            )
+
+            query = Variable(query)
+            positive = Variable(positive)
+            negatives = Variable(negatives)
+            androids = Variable(androids)
             if cuda:
-                query, positive, negatives = query.cuda(), positive.cuda(), negatives.cuda()
+                query = query.cuda()
+                positive = positive.cuda()
+                negatives = negatives.cuda()
+                androids = androids.cuda()
 
             query_encoding = enc_model(query.long())
             positive_encoding = enc_model(positive.long())
@@ -94,7 +113,7 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
                 [enc_model(negatives[:, i].long()) for i in range(NEGATIVE_QUERYS_PER_SAMPLE)]
             )
             android_encodings = torch.stack(
-                [enc_model(andriod_queries.pop()) for _ in range(TARGET_QUERIES_PER_SAMPLE)]
+                [enc_model(androids[:, i].long()) for i in range(TARGET_QUERIES_PER_SAMPLE)]
             )
 
             dis_loss = discriminator_model_loss(dis_model, android_encodings, negative_encodings)

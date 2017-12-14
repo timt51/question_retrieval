@@ -29,10 +29,6 @@ class LSTM(nn.Module):
                     autograd.Variable(torch.zeros(factor, sz, self.hidden_dim)))
 
     def forward(self, word_indices):
-        # alternatively, we can do the entire sequence all at once.
-        # the first value returned by LSTM is all of the hidden states throughout
-        # the sequence. the second is just the most recent hidden state
-        # Add the extra 2nd dimension
         embeddings = self.embedding_layer(word_indices)
         hidden = self.init_hidden(embeddings.size(0))
         lstm_out, hidden = self.lstm(embeddings.float(), hidden)
@@ -74,19 +70,13 @@ class CNN(nn.Module):
             raise ValueError("Invalid self.pool_method: " + str(self.pool_method))
 
 class BinaryClassifier(nn.Module):
-    def __init__(self, embeddings, question_encoding_size, num_hidden_units):
+    def __init__(self, question_encoding_size, num_hidden_units):
         super(BinaryClassifier, self).__init__()
 
-        vocab_size, embed_dim = embeddings.shape
-        self.embedding_layer = nn.Embedding(vocab_size, embed_dim)
-
-        self.embedding_layer.weight.data = torch.from_numpy(embeddings)
-
         self.fc1 = nn.Linear(question_encoding_size, num_hidden_units)
-        self.o = nn.Linear
+        self.o = nn.Linear(num_hidden_units, 2)
 
-    def forward(self, word_indices):
-        embeddings = self.embedding_layer(word_indices)
-        z = self.fc1(embeddings)
+    def forward(self, question_encoding):
+        z = self.fc1(question_encoding)
         a = F.relu(z)
         return F.log_softmax(a)

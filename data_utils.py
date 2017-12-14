@@ -126,7 +126,7 @@ def load_android_corpus(word_to_index):
     For a token T not in word_to_index, word_to_index[T] = len(word_to_index).
     """
     corpus = {}
-    with gzip.open(TOKENIZED_ANDROID_CORPUS_PATH, 'rt', encoding="utf8") as file:
+    with gzip.open(TOKENIZED_ANDROID_CORPUS_PATH, 'rt') as file:
         for line in file:
             entry_id, title, body = line.split("\t")
             entry_id = int(entry_id)
