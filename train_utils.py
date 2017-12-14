@@ -101,17 +101,23 @@ def train_model(model, optimizer, criterion, data,\
             loss.backward()
             optimizer.step()
 
-            # if index % 150 == 149:
-            #     print("Average loss: " + str(np.mean(losses)))
-            #     losses = []
+            if index % 150 == 149:
+                print("Average loss: " + str(np.mean(losses)))
+                losses = []
             losses.append(loss.data)
 
         # Evaluate on the dev set and save the MRR and model parameters
         model.eval()
         mrr = evaluate_model(model, data.dev, data.corpus, data.word_to_index, cuda, helpers.reciprocal_rank)
         print(epoch, mrr)
-        cpu_model = model
-        models_by_epoch.append(Result(cpu_model.state_dict(), mrr))
+
+        # Save the model for this epoch
+        model.cpu()
+        models_by_epoch.append(Result(model.state_dict(), mrr))
+        if cuda:
+            model.cuda()
+
+        # Determine if we should stop training
         if mrr > max_mrr:
             max_mrr = mrr
             models_since_max_mrr = 0
@@ -119,7 +125,10 @@ def train_model(model, optimizer, criterion, data,\
             models_since_max_mrr += 1
         if models_since_max_mrr > 2:
             break
+
     # Pick the best epoch and return the model from that epoch
     best_state_dict = sorted(models_by_epoch, key=lambda x: x.mrr, reverse=True)[0].state_dict
     model.load_state_dict(best_state_dict)
+    mrr = evaluate_model(model, data.dev, data.corpus, data.word_to_index, cuda, helpers.reciprocal_rank)
+    print("best mrr", mrr)
     return model, max_mrr

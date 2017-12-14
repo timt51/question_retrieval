@@ -10,6 +10,7 @@ class LSTM(nn.Module):
         vocab_size, embed_dim = embeddings.shape
         self.embedding_layer = nn.Embedding(vocab_size, embed_dim)
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
+        self.embedding_layer.weight.requires_grad = False
         self.lstm = nn.LSTM(embed_dim, hidden_units, batch_first=True, bidirectional=False)  # Input dim is 3, output dim is 3
         self.hidden_dim = hidden_units
         self.pool_method = pool_method
@@ -54,6 +55,7 @@ class CNN(nn.Module):
         self.embedding_layer = nn.Embedding(vocab_size,
                                             embed_dim)
         self.embedding_layer.weight.data = torch.from_numpy(embeddings)
+        self.embedding_layer.weight.requires_grad = False
 
         self.conv2d = nn.Conv2d(1, feature_dim, (filter_width, embed_dim)).double()
 

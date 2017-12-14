@@ -115,5 +115,5 @@ def precision_at_n(positives, candidates_ranked, n):
     :return: p@n, a real number from [0,1]
     """
     positives_as_set = set(positives)
-    at_or_below_rank_n = set(candidates_ranked[:n+1])
+    at_or_below_rank_n = set(candidates_ranked[:n])
     return precision(positives_as_set, at_or_below_rank_n)
