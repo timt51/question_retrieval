@@ -13,7 +13,7 @@ import helpers
 ##############################################################################
 # Settings
 ##############################################################################
-CUDA = False
+CUDA = True
 
 ##############################################################################
 # Load the dataset
@@ -50,15 +50,15 @@ ANDROID_DATA = Data(ANDROID_CORPUS, None,\
 # Train and evaluate the models for Part 2
 ##############################################################################
 RESULTS = []
-MAX_EPOCHS = 1
+MAX_EPOCHS = 50
 BATCH_SIZE = 32
 FILTER_WIDTH = 2
 POOL_METHOD = "average"
 FEATURE_DIM = 240
-DIS_NUM_HIDDEN_UNITS = [20]
+DIS_NUM_HIDDEN_UNITS = [100]
 DIS_LEARNING_RATES = [-1E-3]
 ENC_LEARNING_RATE = 1E-3
-DIS_TRADE_OFF_RATES = [1E-7]
+DIS_TRADE_OFF_RATES = [1E-6]
 # ENCODER_MODELS = [LSTM(EMBEDDINGS, num_hidden_units, POOL_METHOD, CUDA)]
 
 DIS_HYPERPARAMETERS = itertools.product(DIS_LEARNING_RATES, DIS_NUM_HIDDEN_UNITS, DIS_TRADE_OFF_RATES)

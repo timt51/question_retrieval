@@ -63,7 +63,6 @@ def evaluate_model(model, data, corpus, word_to_index, cuda):
         auc.add(similarities.data, targets)
     return auc.value(MAXIMUM_FALSE_POSITIVE_RATIO)
 
-
 def get_android_batch(batch_size, corpus, word_to_index):
     keys = list(corpus.keys())
     random.shuffle(keys)
@@ -82,7 +81,7 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
     Returns the model at the epoch that produces the highest AUC
     on the dev set.
     """
-    margin = 0.2
+    margin = 0.1
     criterion = MML(margin)
     dis_optimizer = torch.optim.Adam(dis_model.parameters(), lr=dis_lr)
     parameters = filter(lambda p: p.requires_grad, enc_model.parameters())
@@ -146,7 +145,6 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
             total_loss.backward()
             dis_optimizer.step()
             enc_optimizer.step()
-
             if index % 150 == 149:
                 print("Average dis loss: " + str(np.mean(dis_losses)))
                 print("Average enc loss: " + str(np.mean(enc_losses)))
@@ -158,13 +156,11 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
         # Evaluate on the dev set and save the AUC and model parameters
         enc_model.eval()
         mrr = train_utils.evaluate_model(enc_model, source_data.dev, source_data.corpus, source_data.word_to_index, cuda)
-        print(epoch, mrr)
-        """
-        The auc code seems to throw errors. Try to get this code working by putting a break on
-        line 152, to skip to this piece of code.
-        """
+        print(epoch, "mrr source", mrr)
+        mrr = train_utils.evaluate_model(enc_model, target_data.dev, target_data.corpus, target_data.word_to_index, cuda)
+        print(epoch, "mrr target", mrr)
         auc = evaluate_model(enc_model, target_data.dev, target_data.corpus, target_data.word_to_index, cuda)
-        print(epoch, auc)
+        print(epoch, "auc target", auc)
         models_by_epoch.append(Result(enc_model.state_dict(), auc))
         if auc > max_auc:
             max_auc = auc
