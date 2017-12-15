@@ -4,11 +4,8 @@ import itertools
 import torch
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
-<<<<<<< HEAD
 from sklearn.metrics.pairwise import cosine_similarity as cosine
-=======
 import torch.nn.functional as F
->>>>>>> part2-model
 
 import data_utils
 from models import BinaryClassifier, LSTM, CNN
@@ -60,6 +57,30 @@ def evaluate_tfidf(data, tfidf_vectors, query_to_index, eval_func):
         ranked_candidates = [x[0] for x in ranked_candidates]
         rrs.append(eval_func(similar_ids, ranked_candidates))
     return np.mean(rrs)
+
+def evaluate_tfidf_auc(data, tfidf_vectors, query_to_index):
+    IS_SIMMILAR_LABEL = 1
+    NOT_SIMMILAR_LABEL = 0
+    auc = AUCMeter()
+    for entry_id, eval_query_result in data.items():
+        similar_ids = eval_query_result.similar_ids
+        positives = set(similar_ids)
+        candidate_ids = eval_query_result.candidate_ids
+
+        entry_encoding = tfidf_vectors[query_to_index[entry_id]]
+        candidate_similarities = []
+        targets = []
+        for candidate_id in candidate_ids:
+            candidate_encoding = tfidf_vectors[query_to_index[candidate_id]]
+            similarity = cosine(entry_encoding, candidate_encoding)
+            candidate_similarities.append((candidate_id, similarity))
+            targets.append(IS_SIMMILAR_LABEL if candidate in positives else NOT_SIMMILAR_LABEL)
+
+        query_encoding = encodings[0]
+        candidate_encodings = encodings[1:]
+        similarities = torch.Tensor(candidate_similarities)
+        auc.add(similarities, targets)
+    return auc.value(MAXIMUM_FALSE_POSITIVE_RATIO)
 TOKENIZED_ANDROID_CORPUS = data_utils.load_tokenized_android_corpus()
 TOKENIZED_ANDROID_CORPUS = [
     entry.title + entry.body for entry in TOKENIZED_ANDROID_CORPUS.values()
@@ -67,6 +88,8 @@ TOKENIZED_ANDROID_CORPUS = [
 TFIDF_VECTORIZER = TfidfVectorizer()
 TFIDF_VECTORS = TFIDF_VECTORIZER.fit_transform(TOKENIZED_ANDROID_CORPUS)
 QUERY_TO_INDEX = dict(zip(ANDROID_DATA.corpus.keys(), range(len(ANDROID_DATA.corpus))))
+AUC = evaluate_tfidf_auc(ANDROID_DATA.dev, TFIDF_VECTORS, QUERY_TO_INDEX)
+print("AUC", AUC)
 MAP = evaluate_tfidf(ANDROID_DATA.dev, TFIDF_VECTORS, QUERY_TO_INDEX, helpers.mean_average_precision)
 MRR = evaluate_tfidf(ANDROID_DATA.dev, TFIDF_VECTORS, QUERY_TO_INDEX, helpers.reciprocal_rank)
 PA1 = evaluate_tfidf(ANDROID_DATA.dev, TFIDF_VECTORS, QUERY_TO_INDEX, lambda x,y: helpers.precision_at_n(x, y, 1))
