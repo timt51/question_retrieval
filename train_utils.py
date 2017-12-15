@@ -60,8 +60,8 @@ def evaluate_model(model, data, corpus, word_to_index, cuda, eval_func):
         rrs.append(eval_func(positives, candidates_ranked))
     return np.mean(rrs)
 
-def train_model(model, optimizer, criterion, data,\
-                max_epochs, batch_size, cuda):
+def train_model(model, optimizer, criterion, train_data,\
+                max_epochs, batch_size, cuda, eval_data=None):
     """
     Train the model with the given parameters.
     Returns the model at the epoch that produces the highest MRR
@@ -75,13 +75,13 @@ def train_model(model, optimizer, criterion, data,\
     models_since_max_mrr = -1
     for epoch in tqdm(range(max_epochs)):
         model.train()
-        similar_pairs = list(data.train.keys())
+        similar_pairs = list(train_data.train.keys())
         random.shuffle(similar_pairs)
 
         losses = []
         for index, i in enumerate(tqdm(range(0, len(similar_pairs), batch_size))):
             query, positive, negatives = process_batch_pairs(similar_pairs[i:i + batch_size], \
-                                            data.train, data.corpus, data.word_to_index)
+                                            train_data.train, train_data.corpus, train_data.word_to_index)
             query, positive, negatives = Variable(query), Variable(positive), Variable(negatives)
             if cuda:
                 query, positive, negatives = \
@@ -108,7 +108,10 @@ def train_model(model, optimizer, criterion, data,\
 
         # Evaluate on the dev set and save the MRR and model parameters
         model.eval()
-        mrr = evaluate_model(model, data.dev, data.corpus, data.word_to_index, cuda, helpers.reciprocal_rank)
+        if eval_data is None:
+            mrr = evaluate_model(model, train_data.dev, train_data.corpus, train_data.word_to_index, cuda, helpers.reciprocal_rank)
+        else:
+            mrr = evaluate_model(model, eval_data.dev, eval_data.corpus, eval_data.word_to_index, cuda, helpers.reciprocal_rank)
         print(epoch, mrr)
 
         # Save the model for this epoch
@@ -129,6 +132,9 @@ def train_model(model, optimizer, criterion, data,\
     # Pick the best epoch and return the model from that epoch
     best_state_dict = sorted(models_by_epoch, key=lambda x: x.mrr, reverse=True)[0].state_dict
     model.load_state_dict(best_state_dict)
-    mrr = evaluate_model(model, data.dev, data.corpus, data.word_to_index, cuda, helpers.reciprocal_rank)
+    if eval_data is None:
+        mrr = evaluate_model(model, train_data.dev, train_data.corpus, train_data.word_to_index, cuda, helpers.reciprocal_rank)
+    else:
+        mrr = evaluate_model(model, eval_data.dev, eval_data.corpus, eval_data.word_to_index, cuda, helpers.reciprocal_rank)
     print("best mrr", mrr)
     return model, max_mrr

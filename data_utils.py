@@ -1,7 +1,10 @@
 import os
 import subprocess
 import gzip
+import zipfile
 from collections import namedtuple
+import urllib.request
+import pickle
 
 import numpy as np
 
@@ -23,6 +26,12 @@ ANDROID_POS_DEV_DATA_PATH = ANDROID_GIT_REPO_PATH + "dev.pos.txt"
 ANDROID_NEG_DEV_DATA_PATH = ANDROID_GIT_REPO_PATH + "dev.neg.txt"
 ANDROID_POS_TEST_DATA_PATH = ANDROID_GIT_REPO_PATH + "test.pos.txt"
 ANDROID_NEG_TEST_DATA_PATH = ANDROID_GIT_REPO_PATH + "test.neg.txt"
+
+GLOVE_URL = "http://nlp.stanford.edu/data/glove.840B.300d.zip"
+GLOVE_DIR = "./glove/"
+GLOVE_PATH = GLOVE_DIR + "glove.zip"
+GLOVE_FILENAME = "glove.840B.300d.txt"
+PRUNED_GLOVE_PATH = "./glove/glove.pkl"
 
 CorpusEntry = namedtuple("CorpusEntry", "title body")
 EvalQueryResult = namedtuple("EvalQueryResult", "similar_ids candidate_ids")
@@ -109,6 +118,49 @@ def load_embeddings():
     embeddings.append(np.array([0 for _ in range(len(embeddings[0]))]))
     return np.array(embeddings), word_to_index
 
+def load_part2_embeddings():
+    if not os.path.isdir(GLOVE_DIR):
+        try:
+            subprocess.call(["mkdir", GLOVE_DIR])
+        except subprocess.SubprocessError:
+            print("Error: Failed to create glove dir")
+        urllib.request.urlretrieve(GLOVE_URL, GLOVE_PATH)
+
+        words = set()
+        with gzip.open(TOKENIZED_CORPUS_PATH, 'rt', encoding="utf8") as file:
+            for line in file:
+                _, title, body = line.split("\t")
+                for word in title.split(" "):
+                    words.add(word)
+                for word in body.split(" "):
+                    words.add(word)
+        with gzip.open(TOKENIZED_ANDROID_CORPUS_PATH, 'rt', encoding="utf8") as file:
+            for line in file:
+                _, title, body = line.split("\t")
+                for word in title.split(" "):
+                    words.add(word)
+                for word in body.split(" "):
+                    words.add(word)
+
+        embeddings = []
+        word_to_index = {}
+        with zipfile.ZipFile(GLOVE_PATH, 'r') as zf:
+            with zf.open(GLOVE_FILENAME, 'r') as f:
+                count = 0
+                for line in f:
+                    line = line.decode("utf-8").rstrip().split(" ")
+                    if line[0] in words:
+                        word_to_index[line[0]] = count
+                        count += 1
+                        embeddings.append(np.array([float(x) for x in line[1:]]))
+        embeddings.append(np.array([0 for _ in range(len(embeddings[0]))]))
+        embeddings = np.array(embeddings)
+        print(embeddings.shape)
+        pickle.dump((embeddings, word_to_index), open(PRUNED_GLOVE_PATH, "wb"))
+    else:
+        embeddings, word_to_index = pickle.load(open(PRUNED_GLOVE_PATH, "rb"))
+    return embeddings, word_to_index
+
 def download_android_dataset():
     """
     Download the dataset if it does not already exists
@@ -173,7 +225,7 @@ def load_android_eval_data():
     test_data = process_android_eval_data(ANDROID_POS_TEST_DATA_PATH, ANDROID_NEG_TEST_DATA_PATH)
     return dev_data, test_data
 
-def load_tokenized_android_corpus(word_to_index):
+def load_tokenized_android_corpus():
     """
     Returns dict: id -> namedtuple(title, body)
     title and body are encoded as np arrays of indicies using word_to_index.
@@ -184,5 +236,5 @@ def load_tokenized_android_corpus(word_to_index):
         for line in file:
             entry_id, title, body = line.split("\t")
             entry_id = int(entry_id)
-            corpus[entry_id] = CorpusEntry(title.join(" "), body.join(" "))
+            corpus[entry_id] = CorpusEntry(title, body)
     return corpus
