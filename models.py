@@ -48,7 +48,7 @@ class LSTM(nn.Module):
         # TODO: implement me!!
 
 class CNN(nn.Module):
-    def __init__(self, embeddings, filter_width, pool_method, feature_dim, dropout_p):
+    def __init__(self, embeddings, filter_width, pool_method, feature_dim):
         super(CNN, self).__init__()
 
         vocab_size, embed_dim = embeddings.shape
@@ -59,15 +59,12 @@ class CNN(nn.Module):
 
         self.conv2d = nn.Conv2d(1, feature_dim, (filter_width, embed_dim)).double()
 
-        self.dropout = nn.Dropout2d(p=dropout_p)
-
         self.pool_method = pool_method
 
     def forward(self, word_indicies):
         embeddings = self.embedding_layer(word_indicies)
         convolved = self.conv2d(embeddings.unsqueeze(1).double())
         activation = F.tanh(convolved.squeeze(3))
-        activation = self.dropout(activation)
         if self.pool_method == "max":
             return torch.max(activation, 2)
         elif self.pool_method == "average":

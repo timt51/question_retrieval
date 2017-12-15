@@ -11,7 +11,7 @@ import helpers
 ##############################################################################
 # Settings
 ##############################################################################
-CUDA = False
+CUDA = True
 
 ##############################################################################
 # Load the dataset
@@ -35,7 +35,7 @@ MAX_EPOCHS = 50
 BATCH_SIZE = 32
 FILTER_WIDTHS = [3]
 POOL_METHOD = "average"
-FEATURE_DIMS = [667]
+FEATURE_DIMS = [300]
 DROPOUT_PS = [0.1]
 NUM_HIDDEN_UNITS = [240]
 LEARNING_RATES = [1E-3]
@@ -56,9 +56,9 @@ MODELS = []
 #     MODELS.append((mrr, margin, num_hidden_units, learning_rate))
 ##############################################################################
 CNN_HYPERPARAMETERS = itertools.product(MARGINS, FILTER_WIDTHS, FEATURE_DIMS, 
-                                        DROPOUT_PS, LEARNING_RATES)
-for margin, filter_width, feature_dim, dropout_p, learning_rate in CNN_HYPERPARAMETERS:
-    model = models.CNN(EMBEDDINGS, filter_width, POOL_METHOD, feature_dim, dropout_p)
+                                        LEARNING_RATES)
+for margin, filter_width, feature_dim, learning_rate in CNN_HYPERPARAMETERS:
+    model = models.CNN(EMBEDDINGS, filter_width, POOL_METHOD, feature_dim)
     criterion = helpers.MaxMarginLoss(margin)
     parameters = filter(lambda p: p.requires_grad, model.parameters())
     optimizer = torch.optim.Adam(parameters, lr=learning_rate)
@@ -68,15 +68,13 @@ for margin, filter_width, feature_dim, dropout_p, learning_rate in CNN_HYPERPARA
                                     str(margin) + "_" +
                                     str(filter_width) + "_" +
                                     str(feature_dim) + "_" +
-                                    str(dropout_p) + "_" +
                                     str(learning_rate))
     print("should have saved", "./models/cnn_" +
                                     str(margin) + "_" +
                                     str(filter_width) + "_" +
                                     str(feature_dim) + "_" +
-                                    str(dropout_p) + "_" +
                                     str(learning_rate))
-    MODELS.append((mrr, margin, filter_width, feature_dim, dropout_p, learning_rate))
+    MODELS.append((mrr, margin, filter_width, feature_dim, learning_rate))
 
 ##############################################################################
 # Print out the results and evaluate on the test set for Part 1
