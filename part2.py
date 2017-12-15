@@ -13,7 +13,7 @@ import helpers
 ##############################################################################
 # Settings
 ##############################################################################
-CUDA = True
+CUDA = False
 
 ##############################################################################
 # Load the dataset
@@ -50,7 +50,7 @@ ANDROID_DATA = Data(ANDROID_CORPUS, None,\
 # Train and evaluate the models for Part 2
 ##############################################################################
 RESULTS = []
-MAX_EPOCHS = 50
+MAX_EPOCHS = 1
 BATCH_SIZE = 32
 FILTER_WIDTH = 2
 POOL_METHOD = "average"

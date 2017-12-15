@@ -34,14 +34,10 @@ def discriminator_model_loss(dis_model, target_qs, source_qs, cuda):
     """
     all_qs = torch.cat((target_qs[0], source_qs[0]), dim=0)
     input = torch.stack([dis_model(all_qs[i]) for i in range(all_qs.data.shape[0])], dim=0)
-    if cuda:
-        labels = Variable(torch.from_numpy(
-            np.array([SOURCE_LABEL]*source_qs.data.shape[1] + [TARGET_LABEL]*target_qs.data.shape[1])
-        )).cuda()
-    else:
-        labels = Variable(torch.from_numpy(
-            np.array([SOURCE_LABEL]*source_qs.data.shape[1] + [TARGET_LABEL]*target_qs.data.shape[1])
-        ))
+    labels = Variable(torch.from_numpy(
+        np.array([SOURCE_LABEL]*source_qs.data.shape[1] + [TARGET_LABEL]*target_qs.data.shape[1])
+    ))
+    labels = labels.cuda() if cuda else labels
     return F.nll_loss(input, labels)
 
 def evaluate_model(model, data, corpus, word_to_index, cuda):
@@ -51,11 +47,12 @@ def evaluate_model(model, data, corpus, word_to_index, cuda):
         candidates = data[query][1]
 
         embeddings = [pad(merge_title_and_body(corpus[query]), len(word_to_index))]
-        targets = [IS_SIMMILAR_LABEL]
+        targets = []
         for candidate in candidates:
             embeddings.append(pad(merge_title_and_body(corpus[candidate]), len(word_to_index)))
             targets.append(IS_SIMMILAR_LABEL if candidate in positives else NOT_SIMMILAR_LABEL)
         embeddings = Variable(torch.from_numpy(np.array(embeddings)))
+        targets = torch.from_numpy(np.array(targets))
         if cuda:
             embeddings = embeddings.cuda()
 
@@ -141,7 +138,7 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
 
             dis_loss = discriminator_model_loss(dis_model, android_encodings, negative_encodings, cuda)
             enc_loss = criterion(positive_encoding, negative_encodings, query_encoding)
-            
+
             total_loss = enc_loss - lambda_tradeoff*dis_loss
 
             dis_optimizer.zero_grad()
@@ -166,16 +163,16 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
         The auc code seems to throw errors. Try to get this code working by putting a break on
         line 152, to skip to this piece of code.
         """
-        # auc = evaluate_model(enc_model, target_data.dev, target_data.corpus, target_data.word_to_index, cuda)
-        # print(epoch, auc)
-        # models_by_epoch.append(Result(enc_model.state_dict(), auc))
-        # if auc > max_auc:
-        #     max_auc = auc
-        #     models_since_max_auc = 0
-        # else:
-        #     models_since_max_auc += 1
-        # if models_since_max_auc > 2:
-        #     break
+        auc = evaluate_model(enc_model, target_data.dev, target_data.corpus, target_data.word_to_index, cuda)
+        print(epoch, auc)
+        models_by_epoch.append(Result(enc_model.state_dict(), auc))
+        if auc > max_auc:
+            max_auc = auc
+            models_since_max_auc = 0
+        else:
+            models_since_max_auc += 1
+        if models_since_max_auc > 2:
+            break
     # Pick the best epoch and return the model from that epoch
     # best_state_dict = sorted(models_by_epoch, key=lambda x: x.auc, reverse=True)[0].state_dict
     # enc_model.load_state_dict(best_state_dict)
