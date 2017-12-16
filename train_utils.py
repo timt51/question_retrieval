@@ -9,17 +9,12 @@ from torch.autograd import Variable
 import torch.nn.functional as F
 
 import helpers
-
-NEGATIVE_QUERYS_PER_SAMPLE = 20
-MAX_LENGTH = 100
+from helpers import pad
+from helpers import merge_title_and_body
+from helpers import NEGATIVE_QUERYS_PER_SAMPLE
+import part2_train_utils
 
 Result = namedtuple("Result", "state_dict mrr")
-
-def merge_title_and_body(corpus_entry):
-    return np.hstack([corpus_entry.title, corpus_entry.body])
-
-def pad(np_array, value):
-    return np.pad(np_array, (0, MAX_LENGTH), 'constant', constant_values=value)[:MAX_LENGTH]
 
 def process_batch_pairs(pairs, data, corpus, word_to_index):
     batch_querys = []
@@ -101,28 +96,33 @@ def train_model(model, optimizer, criterion, train_data,\
             loss.backward()
             optimizer.step()
 
-            if index % 150 == 149:
-                print("Average loss: " + str(np.mean(losses)))
-                losses = []
-            losses.append(loss.data)
+            # if index % 150 == 149:
+            #     print("Average loss: " + str(np.mean(losses)))
+            #     losses = []
+            # losses.append(loss.data)
 
         # Evaluate on the dev set and save the MRR and model parameters
         model.eval()
-        if eval_data is None:
-            mrr = evaluate_model(model, train_data.dev, train_data.corpus, train_data.word_to_index, cuda, helpers.reciprocal_rank)
-        else:
-            mrr = evaluate_model(model, eval_data.dev, eval_data.corpus, eval_data.word_to_index, cuda, helpers.reciprocal_rank)
-        print(epoch, mrr)
-
+        mrr_source = evaluate_model(model, train_data.dev, train_data.corpus, train_data.word_to_index, cuda, helpers.reciprocal_rank)
+        auc_source = part2_train_utils.evaluate_model(model, train_data.dev, train_data.corpus, train_data.word_to_index, cuda)
+        print(epoch, "mrr source", mrr_source)
+        print(epoch, "auc source", auc_source)
+        if eval_data is not None:
+            mrr_target = evaluate_model(model, eval_data.dev, eval_data.corpus, eval_data.word_to_index, cuda, helpers.reciprocal_rank)
+            auc_target = part2_train_utils.evaluate_model(model, eval_data.dev, eval_data.corpus, eval_data.word_to_index, cuda)
+            print(epoch, "mrr target", mrr_target)
+            print(epoch, "auc target", auc_target)
+            mrr_source = auc_target
+        print(mrr_source)
         # Save the model for this epoch
         model.cpu()
-        models_by_epoch.append(Result(model.state_dict(), mrr))
+        models_by_epoch.append(Result(model.state_dict(), mrr_source))
         if cuda:
             model.cuda()
 
         # Determine if we should stop training
-        if mrr > max_mrr:
-            max_mrr = mrr
+        if mrr_source > max_mrr:
+            max_mrr = mrr_source
             models_since_max_mrr = 0
         else:
             models_since_max_mrr += 1
@@ -132,9 +132,5 @@ def train_model(model, optimizer, criterion, train_data,\
     # Pick the best epoch and return the model from that epoch
     best_state_dict = sorted(models_by_epoch, key=lambda x: x.mrr, reverse=True)[0].state_dict
     model.load_state_dict(best_state_dict)
-    if eval_data is None:
-        mrr = evaluate_model(model, train_data.dev, train_data.corpus, train_data.word_to_index, cuda, helpers.reciprocal_rank)
-    else:
-        mrr = evaluate_model(model, eval_data.dev, eval_data.corpus, eval_data.word_to_index, cuda, helpers.reciprocal_rank)
-    print("best mrr", mrr)
+    print("best mrr", max_mrr)
     return model, max_mrr

@@ -1,8 +1,19 @@
 from collections import namedtuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.autograd import Variable
+from sklearn.metrics.pairwise import cosine_similarity as cosine
+
+from meter import AUCMeter
+
+IS_SIMMILAR_LABEL = 1
+NOT_SIMMILAR_LABEL = 0
+MAXIMUM_FALSE_POSITIVE_RATIO = 0.05
+NEGATIVE_QUERYS_PER_SAMPLE = 20
+MAX_LENGTH = 100
 
 Result = namedtuple("Result", \
         "model lr other_hyperparameters map mrr pat1 pat5")
@@ -117,3 +128,69 @@ def precision_at_n(positives, candidates_ranked, n):
     positives_as_set = set(positives)
     at_or_below_rank_n = set(candidates_ranked[:n])
     return precision(positives_as_set, at_or_below_rank_n)
+
+def evaluate_tfidf(data, tfidf_vectors, query_to_index, eval_func):
+    rrs = []
+    for entry_id, eval_query_result in data.items():
+        similar_ids = eval_query_result.similar_ids
+        candidate_ids = eval_query_result.candidate_ids
+
+        entry_encoding = tfidf_vectors[query_to_index[entry_id]]
+        candidate_similarities = []
+        for candidate_id in candidate_ids:
+            candidate_encoding = tfidf_vectors[query_to_index[candidate_id]]
+            similarity = cosine(entry_encoding, candidate_encoding)
+            candidate_similarities.append((candidate_id, similarity))
+        ranked_candidates = sorted(candidate_similarities, key=lambda x: x[1], reverse=True)
+        ranked_candidates = [x[0] for x in ranked_candidates]
+        rrs.append(eval_func(similar_ids, ranked_candidates))
+    return np.mean(rrs)
+
+def evaluate_tfidf_auc(data, tfidf_vectors, query_to_index):
+    auc = AUCMeter()
+    for entry_id, eval_query_result in data.items():
+        similar_ids = eval_query_result.similar_ids
+        positives = set(similar_ids)
+        candidate_ids = eval_query_result.candidate_ids
+
+        entry_encoding = tfidf_vectors[query_to_index[entry_id]]
+        candidate_similarities = []
+        targets = []
+        for candidate_id in candidate_ids:
+            candidate_encoding = tfidf_vectors[query_to_index[candidate_id]]
+            similarity = cosine(entry_encoding, candidate_encoding)
+            candidate_similarities.append(similarity.item(0))
+            targets.append(IS_SIMMILAR_LABEL if candidate_id in positives else NOT_SIMMILAR_LABEL)
+
+        similarities = torch.Tensor(candidate_similarities)
+        auc.add(similarities, torch.Tensor(targets))
+    return auc.value(MAXIMUM_FALSE_POSITIVE_RATIO)
+
+def evaluate_model(model, data, corpus, word_to_index, cuda):
+    auc = AUCMeter()
+    for query in data.keys():
+        positives = set(data[query][0])
+        candidates = data[query][1]
+
+        embeddings = [pad(merge_title_and_body(corpus[query]), len(word_to_index))]
+        targets = []
+        for candidate in candidates:
+            embeddings.append(pad(merge_title_and_body(corpus[candidate]), len(word_to_index)))
+            targets.append(IS_SIMMILAR_LABEL if candidate in positives else NOT_SIMMILAR_LABEL)
+        embeddings = Variable(torch.from_numpy(np.array(embeddings)))
+        targets = torch.from_numpy(np.array(targets))
+        if cuda:
+            embeddings = embeddings.cuda()
+
+        encodings = model(embeddings)
+        query_encoding = encodings[0]
+        candidate_encodings = encodings[1:]
+        similarities = (F.cosine_similarity(candidate_encodings, query_encoding.repeat(len(encodings)-1, 1), dim=1))
+        auc.add(similarities.data, targets)
+    return auc.value(MAXIMUM_FALSE_POSITIVE_RATIO)
+
+def merge_title_and_body(corpus_entry):
+    return np.hstack([corpus_entry.title, corpus_entry.body])
+
+def pad(np_array, value):
+    return np.pad(np_array, (0, MAX_LENGTH), 'constant', constant_values=value)[:MAX_LENGTH]

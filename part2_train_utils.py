@@ -7,9 +7,12 @@ import torch
 from torch.autograd import Variable
 import torch.nn.functional as F
 
-from train_utils import process_batch_pairs, NEGATIVE_QUERYS_PER_SAMPLE, pad, merge_title_and_body
 import train_utils
 from helpers import MaxMarginLoss as MML
+from helpers import pad
+from helpers import merge_title_and_body
+from helpers import NEGATIVE_QUERYS_PER_SAMPLE
+import helpers
 from meter import AUCMeter
 
 Result = namedtuple("Result", "state_dict auc")
@@ -18,24 +21,16 @@ SOURCE_LABEL = 0
 TARGET_LABEL = 1
 IS_SIMMILAR_LABEL = 1
 NOT_SIMMILAR_LABEL = 0
+NEGATIVE_QUERYS_PER_SAMPLE = train_utils.NEGATIVE_QUERYS_PER_SAMPLE
 TARGET_QUERIES_PER_SAMPLE = NEGATIVE_QUERYS_PER_SAMPLE
 SOURCE_QUERIES_PER_SAMPLE = NEGATIVE_QUERYS_PER_SAMPLE
 MAXIMUM_FALSE_POSITIVE_RATIO = 0.05
 
 def discriminator_model_loss(dis_model, target_qs, source_qs, cuda):
-    """
-    Ok, so in the past each batch was composed of batch_size samples
-    and each of those samples has 20 negative samples. In this case
-    we just want one batch of X number of samples. For simplicity
-    I'm just choosing X = 2*batch_size. I do this by just taking
-    target_qs[0] and source_qs[0]. This code compiles,
-    may work properly (as in trains the network correctly), and
-    is definitely not efficient lol.
-    """
-    all_qs = torch.cat((target_qs[0], source_qs[0]), dim=0)
+    all_qs = torch.cat((target_qs, source_qs), dim=0)
     input = torch.stack([dis_model(all_qs[i]) for i in range(all_qs.data.shape[0])], dim=0)
     labels = Variable(torch.from_numpy(
-        np.array([SOURCE_LABEL]*source_qs.data.shape[1] + [TARGET_LABEL]*target_qs.data.shape[1])
+        np.array([SOURCE_LABEL]*source_qs.data.shape[0] + [TARGET_LABEL]*target_qs.data.shape[0])
     ))
     labels = labels.cuda() if cuda else labels
     return F.nll_loss(input, labels)
@@ -63,25 +58,22 @@ def evaluate_model(model, data, corpus, word_to_index, cuda):
         auc.add(similarities.data, targets)
     return auc.value(MAXIMUM_FALSE_POSITIVE_RATIO)
 
-def get_android_batch(batch_size, corpus, word_to_index):
+def get_dis_batch(batch_size, corpus, word_to_index):
     keys = list(corpus.keys())
     random.shuffle(keys)
-    keys = keys[:TARGET_QUERIES_PER_SAMPLE]
-    embedded = []
-    for _ in range(batch_size):
-        query_index_sequences = [merge_title_and_body(corpus[k]) for k in keys]
-        embedded.append([pad(seq, len(word_to_index)) for seq in query_index_sequences])
-    android_batch = torch.from_numpy(np.array(embedded))
-    return android_batch
+    keys = keys[:batch_size]
+    query_index_sequences = [merge_title_and_body(corpus[k]) for k in keys]
+    embedded = [pad(seq, len(word_to_index)) for seq in query_index_sequences]
+    batch = torch.from_numpy(np.array(embedded))
+    return batch
 
 def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
-                max_epochs, batch_size, enc_lr, dis_lr, cuda):
+                max_epochs, batch_size, enc_lr, dis_lr, margin, cuda):
     """
     Train the model with the given parameters.
     Returns the model at the epoch that produces the highest AUC
     on the dev set.
     """
-    margin = 0.1
     criterion = MML(margin)
     dis_optimizer = torch.optim.Adam(dis_model.parameters(), lr=dis_lr)
     parameters = filter(lambda p: p.requires_grad, enc_model.parameters())
@@ -104,14 +96,19 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
         dis_losses = []
         enc_losses = []
         for index, i in enumerate(tqdm(range(0, len(similar_pairs), batch_size))):
-            query, positive, negatives = process_batch_pairs(
+            query, positive, negatives = train_utils.process_batch_pairs(
                 similar_pairs[i:i + batch_size],
                 source_data.train,
                 source_data.corpus,
                 source_data.word_to_index
             )
-            androids = get_android_batch(
-                batch_size,
+            ubuntus = get_dis_batch(
+                SOURCE_QUERIES_PER_SAMPLE,
+                source_data.corpus,
+                source_data.word_to_index
+            )
+            androids = get_dis_batch(
+                TARGET_QUERIES_PER_SAMPLE,
                 target_data.corpus,
                 target_data.word_to_index
             )
@@ -119,11 +116,13 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
             query = Variable(query)
             positive = Variable(positive)
             negatives = Variable(negatives)
+            ubuntus = Variable(ubuntus)
             androids = Variable(androids)
             if cuda:
                 query = query.cuda()
                 positive = positive.cuda()
                 negatives = negatives.cuda()
+                ubuntus = ubuntus.cuda()
                 androids = androids.cuda()
 
             query_encoding = enc_model(query.long())
@@ -131,11 +130,10 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
             negative_encodings = torch.stack(
                 [enc_model(negatives[:, i].long()) for i in range(NEGATIVE_QUERYS_PER_SAMPLE)]
             )
-            android_encodings = torch.stack(
-                [enc_model(androids[:, i].long()) for i in range(TARGET_QUERIES_PER_SAMPLE)]
-            )
+            ubuntu_encodings = enc_model(ubuntus.long())
+            android_encodings = enc_model(androids.long())
 
-            dis_loss = discriminator_model_loss(dis_model, android_encodings, negative_encodings, cuda)
+            dis_loss = discriminator_model_loss(dis_model, android_encodings, ubuntu_encodings, cuda)
             enc_loss = criterion(positive_encoding, negative_encodings, query_encoding)
 
             total_loss = enc_loss - lambda_tradeoff*dis_loss
@@ -145,7 +143,7 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
             total_loss.backward()
             dis_optimizer.step()
             enc_optimizer.step()
-            if index % 150 == 149:
+            if index % 360 == 359:
                 print("Average dis loss: " + str(np.mean(dis_losses)))
                 print("Average enc loss: " + str(np.mean(enc_losses)))
                 dis_losses = []
@@ -155,10 +153,12 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
 
         # Evaluate on the dev set and save the AUC and model parameters
         enc_model.eval()
-        mrr = train_utils.evaluate_model(enc_model, source_data.dev, source_data.corpus, source_data.word_to_index, cuda)
+        mrr = train_utils.evaluate_model(enc_model, source_data.dev, source_data.corpus, source_data.word_to_index, cuda, helpers.reciprocal_rank)
         print(epoch, "mrr source", mrr)
-        mrr = train_utils.evaluate_model(enc_model, target_data.dev, target_data.corpus, target_data.word_to_index, cuda)
+        mrr = train_utils.evaluate_model(enc_model, target_data.dev, target_data.corpus, target_data.word_to_index, cuda, helpers.reciprocal_rank)
         print(epoch, "mrr target", mrr)
+        auc = evaluate_model(enc_model, source_data.dev, source_data.corpus, source_data.word_to_index, cuda)
+        print(epoch, "auc source", auc)
         auc = evaluate_model(enc_model, target_data.dev, target_data.corpus, target_data.word_to_index, cuda)
         print(epoch, "auc target", auc)
         models_by_epoch.append(Result(enc_model.state_dict(), auc))
