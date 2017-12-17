@@ -40,9 +40,6 @@ class LSTM(nn.Module):
         else:
             raise ValueError("Invalid self.pool_method: " + str(self.pool_method))
 
-        # dd9*0c72L884
-        # TODO: implement me!!
-
 class CNN(nn.Module):
     def __init__(self, embeddings, filter_width, pool_method, feature_dim, dropout_p):
         super(CNN, self).__init__()

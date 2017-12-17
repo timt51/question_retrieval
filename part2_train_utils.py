@@ -143,11 +143,6 @@ def train_model(enc_model, dis_model, lambda_tradeoff, source_data, target_data,
             total_loss.backward()
             dis_optimizer.step()
             enc_optimizer.step()
-            if index % 360 == 359:
-                print("Average dis loss: " + str(np.mean(dis_losses)))
-                print("Average enc loss: " + str(np.mean(enc_losses)))
-                dis_losses = []
-                enc_losses = []
             dis_losses.append(dis_loss.data)
             enc_losses.append(enc_loss.data)
 

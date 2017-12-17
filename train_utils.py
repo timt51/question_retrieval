@@ -96,10 +96,7 @@ def train_model(model, optimizer, criterion, train_data,\
             loss.backward()
             optimizer.step()
 
-            # if index % 150 == 149:
-            #     print("Average loss: " + str(np.mean(losses)))
-            #     losses = []
-            # losses.append(loss.data)
+            losses.append(loss.data)
 
         # Evaluate on the dev set and save the MRR and model parameters
         model.eval()
