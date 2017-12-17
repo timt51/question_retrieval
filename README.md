@@ -1,4 +1,4 @@
-# 6.806/6.864 Final Project
+# 6.806 Final Project
 
 Run main.py to train models for part 1 of the project.
 
